@@ -1,0 +1,27 @@
+# === Java / Gradle ===
+backend/build/
+backend/.gradle/
+*.class
+*.jar
+!backend/gradle/wrapper/gradle-wrapper.jar
+
+# === Node.js（フロントエンド追加時用） ===
+node_modules/
+.next/
+out/
+
+# === IDE ===
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# === macOS ===
+.DS_Store
+
+# === ドキュメント（業務仕様を含むため除外） ===
+Maindocs/
+Mydocs/
+
+# === 環境固有 ===
+*.log

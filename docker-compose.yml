@@ -1,0 +1,25 @@
+services:
+  # ローカル開発用 PostgreSQL
+  db:
+    image: postgres:16
+    container_name: kintai-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: kintai
+      POSTGRES_PASSWORD: kintai
+      POSTGRES_DB: kintai
+      TZ: Asia/Tokyo
+    volumes:
+      # データ永続化（コンテナを消してもデータが残る）
+      - db-data:/var/lib/postgresql/data
+      # 初期化スクリプト（初回起動時のみ実行される）
+      - ./docker/db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kintai"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:

@@ -1,0 +1,19 @@
+spring:
+  # ローカルPostgreSQLに接続（Docker Compose）
+  datasource:
+    url: jdbc:postgresql://localhost:5432/kintai
+    username: kintai
+    password: kintai
+    driver-class-name: org.postgresql.Driver
+
+  # 開発時はSQLをログに表示
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+
+# CORS設定（Next.js開発サーバーからのアクセスを許可）
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:3000
