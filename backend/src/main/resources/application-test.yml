@@ -1,7 +1,7 @@
 spring:
   # テスト用PostgreSQLに接続（Docker Composeの別DB）
   datasource:
-    url: jdbc:postgresql://localhost:5432/kintai_test
+    url: jdbc:postgresql://localhost:5433/kintai_test
     username: kintai
     password: kintai
     driver-class-name: org.postgresql.Driver

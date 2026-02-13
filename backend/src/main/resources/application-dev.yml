@@ -1,7 +1,7 @@
 spring:
   # ローカルPostgreSQLに接続（Docker Compose）
   datasource:
-    url: jdbc:postgresql://localhost:5432/kintai
+    url: jdbc:postgresql://localhost:5433/kintai
     username: kintai
     password: kintai
     driver-class-name: org.postgresql.Driver
