@@ -158,6 +158,37 @@ public class AttendanceRecord {
     }
 
     // ========================
+    // DB復元用ファクトリメソッド
+    // ========================
+
+    /**
+     * DBから読み込んだデータで勤怠記録を復元する — リポジトリ実装専用
+     *
+     * <p>パッケージプライベートコンストラクタを呼び出すためのpublic静的メソッド。
+     * インフラ層のリポジトリ実装がドメインオブジェクトを復元する際に使用する。
+     * ガード条件のチェックは行わない（DB上のデータは整合性が保証されている）。</p>
+     */
+    public static AttendanceRecord reconstruct(
+            AttendanceRecordId id,
+            EmployeeId employeeId,
+            WorkDate workDate,
+            ShiftPatternId shiftPatternId,
+            AttendanceStatus status,
+            List<ClockEntry> clockEntries,
+            WorkDuration workDuration,
+            OvertimeDuration overtimeDuration,
+            int version,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        return new AttendanceRecord(
+                id, employeeId, workDate, shiftPatternId,
+                status, clockEntries, workDuration, overtimeDuration,
+                version, createdAt, updatedAt
+        );
+    }
+
+    // ========================
     // コマンドメソッド（7つ）
     // ========================
 
