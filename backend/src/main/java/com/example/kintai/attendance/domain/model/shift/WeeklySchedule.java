@@ -92,6 +92,24 @@ public class WeeklySchedule {
     }
 
     // ========================
+    // DB復元用ファクトリメソッド
+    // ========================
+
+    /**
+     * DBから読み込んだデータで週次スケジュールを復元する — リポジトリ実装専用
+     */
+    public static WeeklySchedule reconstruct(
+            ScheduleId id, EmployeeId employeeId, LocalDate weekStartDate,
+            ScheduleStatus status, Map<DayOfWeek, ShiftPatternId> assignments,
+            int version, Instant createdAt, Instant updatedAt
+    ) {
+        return new WeeklySchedule(
+                id, employeeId, weekStartDate, status,
+                assignments, version, createdAt, updatedAt
+        );
+    }
+
+    // ========================
     // ファクトリメソッド
     // ========================
 

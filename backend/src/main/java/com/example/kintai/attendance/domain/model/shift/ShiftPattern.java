@@ -85,6 +85,25 @@ public class ShiftPattern {
     }
 
     // ========================
+    // DB復元用ファクトリメソッド
+    // ========================
+
+    /**
+     * DBから読み込んだデータでシフトパターンを復元する — リポジトリ実装専用
+     */
+    public static ShiftPattern reconstruct(
+            ShiftPatternId id, PatternName name,
+            LocalTime startTime, LocalTime endTime,
+            int breakMinutes, boolean isOvernight, boolean isActive,
+            int version, Instant createdAt, Instant updatedAt
+    ) {
+        return new ShiftPattern(
+                id, name, startTime, endTime, breakMinutes,
+                isOvernight, isActive, version, createdAt, updatedAt
+        );
+    }
+
+    // ========================
     // ファクトリメソッド
     // ========================
 
