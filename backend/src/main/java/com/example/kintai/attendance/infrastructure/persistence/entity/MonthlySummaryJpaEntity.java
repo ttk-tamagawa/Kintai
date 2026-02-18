@@ -92,6 +92,41 @@ public class MonthlySummaryJpaEntity {
     /** JPA必須の引数なしコンストラクタ */
     protected MonthlySummaryJpaEntity() {}
 
+    /**
+     * プロジェクターが使用する初期生成コンストラクタ
+     *
+     * <p>従業員の月次サマリーを初めて作成する際に使用する。
+     * 集計値はゼロ、有給使用はゼロで初期化する。</p>
+     *
+     * @param id           月次サマリーID（UUID）
+     * @param employeeId   従業員ID
+     * @param employeeName 従業員名（非正規化）
+     * @param departmentId 部門ID
+     * @param year         年
+     * @param month        月（1〜12）
+     */
+    public MonthlySummaryJpaEntity(UUID id, UUID employeeId, String employeeName,
+                                   String departmentId, short year, short month) {
+        this.id = id;
+        this.employeeId = employeeId;
+        this.employeeName = employeeName;
+        this.departmentId = departmentId;
+        this.year = year;
+        this.month = month;
+        this.totalWorkDays = 0;
+        this.totalWorkMinutes = 0;
+        this.totalOvertimeMinutes = 0;
+        this.totalLateNightMinutes = 0;
+        this.totalHolidayMinutes = 0;
+        this.totalBreakMinutes = 0;
+        this.paidLeaveUsed = BigDecimal.ZERO;
+        Instant now = Instant.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+        this.createdBy = "system";
+        this.updatedBy = "system";
+    }
+
     // ゲッター
 
     public UUID getId() { return id; }
@@ -107,4 +142,25 @@ public class MonthlySummaryJpaEntity {
     public int getTotalHolidayMinutes() { return totalHolidayMinutes; }
     public int getTotalBreakMinutes() { return totalBreakMinutes; }
     public BigDecimal getPaidLeaveUsed() { return paidLeaveUsed; }
+
+    // プロジェクター用セッター（Read Modelの更新に使用）
+
+    /** 出勤日数を設定する */
+    public void setTotalWorkDays(int totalWorkDays) { this.totalWorkDays = totalWorkDays; }
+    /** 総勤務時間（分）を設定する */
+    public void setTotalWorkMinutes(int totalWorkMinutes) { this.totalWorkMinutes = totalWorkMinutes; }
+    /** 総残業時間（分）を設定する */
+    public void setTotalOvertimeMinutes(int v) { this.totalOvertimeMinutes = v; }
+    /** 総深夜勤務時間（分）を設定する */
+    public void setTotalLateNightMinutes(int v) { this.totalLateNightMinutes = v; }
+    /** 総休日勤務時間（分）を設定する */
+    public void setTotalHolidayMinutes(int v) { this.totalHolidayMinutes = v; }
+    /** 総休憩時間（分）を設定する */
+    public void setTotalBreakMinutes(int totalBreakMinutes) { this.totalBreakMinutes = totalBreakMinutes; }
+    /** 有給使用日数を設定する */
+    public void setPaidLeaveUsed(BigDecimal paidLeaveUsed) { this.paidLeaveUsed = paidLeaveUsed; }
+    /** 更新日時を設定する */
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    /** 更新者を設定する */
+    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
 }

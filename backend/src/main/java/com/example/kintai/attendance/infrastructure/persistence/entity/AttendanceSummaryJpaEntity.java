@@ -108,6 +108,37 @@ public class AttendanceSummaryJpaEntity {
     /** JPA必須の引数なしコンストラクタ */
     protected AttendanceSummaryJpaEntity() {}
 
+    /**
+     * プロジェクターが使用する初期生成コンストラクタ
+     *
+     * <p>出勤打刻・手動勤務登録で初めてサマリーを作成する際に使用する。
+     * 数値フィールドはゼロ、ステータスはNOT_CLOCKEDで初期化する。</p>
+     *
+     * @param attendanceId 勤怠記録ID（主キー）
+     * @param employeeId   従業員ID
+     * @param workDate     勤務日
+     */
+    public AttendanceSummaryJpaEntity(UUID attendanceId, UUID employeeId, LocalDate workDate) {
+        this.attendanceId = attendanceId;
+        this.employeeId = employeeId;
+        this.workDate = workDate;
+        this.status = "NOT_CLOCKED";
+        this.scheduledMinutes = 0;
+        this.actualMinutes = 0;
+        this.breakMinutes = 0;
+        this.netWorkMinutes = 0;
+        this.regularOvertimeMinutes = 0;
+        this.lateNightMinutes = 0;
+        this.holidayMinutes = 0;
+        this.totalOvertimeMinutes = 0;
+        this.eventCount = 0;
+        Instant now = Instant.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+        this.createdBy = "system";
+        this.updatedBy = "system";
+    }
+
     // ゲッター
 
     public UUID getAttendanceId() { return attendanceId; }
@@ -126,4 +157,37 @@ public class AttendanceSummaryJpaEntity {
     public int getTotalOvertimeMinutes() { return totalOvertimeMinutes; }
     public Instant getLastEventAt() { return lastEventAt; }
     public int getEventCount() { return eventCount; }
+
+    // プロジェクター用セッター（Read Modelの更新に使用）
+
+    /** 勤怠ステータスを設定する */
+    public void setStatus(String status) { this.status = status; }
+    /** 出勤時刻を設定する */
+    public void setClockInTime(Instant clockInTime) { this.clockInTime = clockInTime; }
+    /** 退勤時刻を設定する */
+    public void setClockOutTime(Instant clockOutTime) { this.clockOutTime = clockOutTime; }
+    /** 所定労働時間（分）を設定する */
+    public void setScheduledMinutes(int scheduledMinutes) { this.scheduledMinutes = scheduledMinutes; }
+    /** 実労働時間（分）を設定する */
+    public void setActualMinutes(int actualMinutes) { this.actualMinutes = actualMinutes; }
+    /** 休憩時間（分）を設定する */
+    public void setBreakMinutes(int breakMinutes) { this.breakMinutes = breakMinutes; }
+    /** 正味労働時間（分）を設定する */
+    public void setNetWorkMinutes(int netWorkMinutes) { this.netWorkMinutes = netWorkMinutes; }
+    /** 普通残業時間（分）を設定する */
+    public void setRegularOvertimeMinutes(int v) { this.regularOvertimeMinutes = v; }
+    /** 深夜勤務時間（分）を設定する */
+    public void setLateNightMinutes(int lateNightMinutes) { this.lateNightMinutes = lateNightMinutes; }
+    /** 休日勤務時間（分）を設定する */
+    public void setHolidayMinutes(int holidayMinutes) { this.holidayMinutes = holidayMinutes; }
+    /** 残業合計時間（分）を設定する */
+    public void setTotalOvertimeMinutes(int v) { this.totalOvertimeMinutes = v; }
+    /** 最終イベント日時を設定する */
+    public void setLastEventAt(Instant lastEventAt) { this.lastEventAt = lastEventAt; }
+    /** イベント数を設定する */
+    public void setEventCount(int eventCount) { this.eventCount = eventCount; }
+    /** 更新日時を設定する */
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    /** 更新者を設定する */
+    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
 }

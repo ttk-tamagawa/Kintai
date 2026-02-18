@@ -129,6 +129,32 @@ public class WeeklyScheduleSummaryJpaEntity {
     /** JPA必須の引数なしコンストラクタ */
     protected WeeklyScheduleSummaryJpaEntity() {}
 
+    /**
+     * プロジェクターが使用する初期生成コンストラクタ
+     *
+     * <p>シフト割当イベントで初めてサマリーを作成する際に使用する。
+     * 曜日別パターンはnull（未割当）、割当日数はゼロで初期化する。</p>
+     *
+     * @param weeklyScheduleId スケジュールID（主キー）
+     * @param employeeId       従業員ID
+     * @param weekStartDate    週の開始日（月曜日）
+     * @param status           スケジュールステータス
+     */
+    public WeeklyScheduleSummaryJpaEntity(UUID weeklyScheduleId, UUID employeeId,
+                                           LocalDate weekStartDate, String status) {
+        this.weeklyScheduleId = weeklyScheduleId;
+        this.employeeId = employeeId;
+        this.weekStartDate = weekStartDate;
+        this.status = status;
+        this.assignedDays = 0;
+        this.eventCount = 0;
+        Instant now = Instant.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+        this.createdBy = "system";
+        this.updatedBy = "system";
+    }
+
     // ゲッター
 
     public UUID getWeeklyScheduleId() { return weeklyScheduleId; }
@@ -152,4 +178,47 @@ public class WeeklyScheduleSummaryJpaEntity {
     public int getAssignedDays() { return assignedDays; }
     public Instant getLastEventAt() { return lastEventAt; }
     public int getEventCount() { return eventCount; }
+
+    // プロジェクター用セッター（Read Modelの更新に使用）
+
+    /** ステータスを設定する */
+    public void setStatus(String status) { this.status = status; }
+    /** 月曜日のパターンIDを設定する */
+    public void setMondayPatternId(UUID v) { this.mondayPatternId = v; }
+    /** 月曜日のパターン名を設定する */
+    public void setMondayPatternName(String v) { this.mondayPatternName = v; }
+    /** 火曜日のパターンIDを設定する */
+    public void setTuesdayPatternId(UUID v) { this.tuesdayPatternId = v; }
+    /** 火曜日のパターン名を設定する */
+    public void setTuesdayPatternName(String v) { this.tuesdayPatternName = v; }
+    /** 水曜日のパターンIDを設定する */
+    public void setWednesdayPatternId(UUID v) { this.wednesdayPatternId = v; }
+    /** 水曜日のパターン名を設定する */
+    public void setWednesdayPatternName(String v) { this.wednesdayPatternName = v; }
+    /** 木曜日のパターンIDを設定する */
+    public void setThursdayPatternId(UUID v) { this.thursdayPatternId = v; }
+    /** 木曜日のパターン名を設定する */
+    public void setThursdayPatternName(String v) { this.thursdayPatternName = v; }
+    /** 金曜日のパターンIDを設定する */
+    public void setFridayPatternId(UUID v) { this.fridayPatternId = v; }
+    /** 金曜日のパターン名を設定する */
+    public void setFridayPatternName(String v) { this.fridayPatternName = v; }
+    /** 土曜日のパターンIDを設定する */
+    public void setSaturdayPatternId(UUID v) { this.saturdayPatternId = v; }
+    /** 土曜日のパターン名を設定する */
+    public void setSaturdayPatternName(String v) { this.saturdayPatternName = v; }
+    /** 日曜日のパターンIDを設定する */
+    public void setSundayPatternId(UUID v) { this.sundayPatternId = v; }
+    /** 日曜日のパターン名を設定する */
+    public void setSundayPatternName(String v) { this.sundayPatternName = v; }
+    /** シフト割当日数を設定する */
+    public void setAssignedDays(int assignedDays) { this.assignedDays = assignedDays; }
+    /** 最終イベント日時を設定する */
+    public void setLastEventAt(Instant lastEventAt) { this.lastEventAt = lastEventAt; }
+    /** イベント数を設定する */
+    public void setEventCount(int eventCount) { this.eventCount = eventCount; }
+    /** 更新日時を設定する */
+    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    /** 更新者を設定する */
+    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
 }
