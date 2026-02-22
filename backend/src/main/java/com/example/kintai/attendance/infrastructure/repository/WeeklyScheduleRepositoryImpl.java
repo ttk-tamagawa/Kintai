@@ -90,6 +90,15 @@ public class WeeklyScheduleRepositoryImpl implements WeeklyScheduleRepository {
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsFutureAssignmentByPatternId(ShiftPatternId patternId) {
+        // 今日以降の週次スケジュールで指定パターンが使用されているか確認する
+        return jpaWeeklyScheduleRepo.existsFutureAssignmentByPatternId(
+                patternId.value(), LocalDate.now()
+        );
+    }
+
     // ========================
     // 変換メソッド
     // ========================

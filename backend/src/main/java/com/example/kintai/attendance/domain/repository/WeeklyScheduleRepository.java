@@ -3,6 +3,7 @@ package com.example.kintai.attendance.domain.repository;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ScheduleId;
+import com.example.kintai.shared.domain.model.ShiftPatternId;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -37,4 +38,16 @@ public interface WeeklyScheduleRepository {
      * 従業員IDと週開始日の組み合わせが既に存在するか確認する
      */
     boolean existsByEmployeeIdAndWeekStartDate(EmployeeId employeeId, LocalDate weekStartDate);
+
+    /**
+     * 未来の週次スケジュールで指定パターンが使用されているか確認する
+     *
+     * <p>今日以降の週開始日を持つスケジュールの月〜日の7つの割当カラムのいずれかに
+     * 指定パターンIDが含まれている場合trueを返す。
+     * パターン無効化時のガード条件として使用する。</p>
+     *
+     * @param patternId チェック対象のシフトパターンID
+     * @return 未来の割当で使用されている場合true
+     */
+    boolean existsFutureAssignmentByPatternId(ShiftPatternId patternId);
 }
