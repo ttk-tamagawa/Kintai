@@ -7,6 +7,7 @@ import com.example.kintai.attendance.domain.model.ClockSource;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.attendance.domain.model.ClockType;
 import com.example.kintai.attendance.domain.model.WorkDate;
+import com.example.kintai.attendance.domain.service.WorkDurationCalculator;
 import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
 import com.example.kintai.attendance.presentation.dto.BreakEndResponse;
 import com.example.kintai.attendance.presentation.dto.BreakStartResponse;
@@ -150,7 +151,9 @@ public class AttendanceCommandController {
         AttendanceRecord record = findRecordByEmployeeAndDate(employeeId, workDate);
 
         // アプリケーションサービスを呼び出す（clockOut → 勤務時間計算 → 保存）
-        commandService.clockOut(record.getId(), clockTime, source);
+        // 計算結果を受け取る（リポジトリはWorkDurationを永続化しないためサービスから取得）
+        WorkDurationCalculator.CalculationResult calcResult =
+                commandService.clockOut(record.getId(), clockTime, source);
 
         // 保存後のレコードを再取得してレスポンスを組み立てる
         AttendanceRecord updated = findRecordOrThrow(record.getId());
@@ -166,9 +169,9 @@ public class AttendanceCommandController {
                 updated.getStatus().name(),
                 clockInTime,
                 clockOutTime,
-                updated.getWorkDuration().breakMinutes(),
-                updated.getWorkDuration().netWorkMinutes(),
-                updated.getOvertimeDuration().totalOvertimeMinutes(),
+                calcResult.workDuration().breakMinutes(),
+                calcResult.workDuration().netWorkMinutes(),
+                calcResult.overtimeDuration().totalOvertimeMinutes(),
                 source.name(),
                 updated.getUpdatedAt()
         );

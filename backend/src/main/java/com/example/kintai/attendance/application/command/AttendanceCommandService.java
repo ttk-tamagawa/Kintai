@@ -5,14 +5,13 @@ import com.example.kintai.attendance.domain.model.event.*;
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.repository.AttendanceEventRepository;
 import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
-import com.example.kintai.attendance.domain.repository.ClockEntryRepository;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.service.WorkDurationCalculator;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,8 +31,7 @@ import java.util.List;
  *   <li>集約（AttendanceRecord）をリポジトリから取得する（または新規作成する）</li>
  *   <li>集約のコマンドメソッドを呼び出す（ドメインロジック実行）</li>
  *   <li>必要に応じて勤務時間を計算する（ドメインサービス）</li>
- *   <li>集約をリポジトリに保存する</li>
- *   <li>新規打刻エントリを打刻テーブルに追記する</li>
+ *   <li>集約をリポジトリに保存する（打刻エントリもリポジトリ内で自動保存される）</li>
  *   <li>ドメインイベントをイベントストアに記録する（JSONB形式）</li>
  *   <li>ドメインイベントを発行する（プロジェクターがRead Modelを更新する）</li>
  * </ol>
@@ -69,9 +66,6 @@ public class AttendanceCommandService {
     /** 勤怠イベントリポジトリ — イベントストアへの追記（INSERT ONLY） */
     private final AttendanceEventRepository attendanceEventRepository;
 
-    /** 打刻エントリリポジトリ — 打刻ログの追記（INSERT ONLY） */
-    private final ClockEntryRepository clockEntryRepository;
-
     /** シフトパターンリポジトリ — シフト制の所定労働時間取得用 */
     private final ShiftPatternRepository shiftPatternRepository;
 
@@ -85,12 +79,11 @@ public class AttendanceCommandService {
     private final ObjectMapper objectMapper;
 
     /**
-     * コンストラクタ — 7つの依存を注入する
+     * コンストラクタ — 6つの依存を注入する
      */
     public AttendanceCommandService(
             AttendanceRecordRepository attendanceRecordRepository,
             AttendanceEventRepository attendanceEventRepository,
-            ClockEntryRepository clockEntryRepository,
             ShiftPatternRepository shiftPatternRepository,
             WorkDurationCalculator workDurationCalculator,
             ApplicationEventPublisher eventPublisher,
@@ -98,7 +91,6 @@ public class AttendanceCommandService {
     ) {
         this.attendanceRecordRepository = attendanceRecordRepository;
         this.attendanceEventRepository = attendanceEventRepository;
-        this.clockEntryRepository = clockEntryRepository;
         this.shiftPatternRepository = shiftPatternRepository;
         this.workDurationCalculator = workDurationCalculator;
         this.eventPublisher = eventPublisher;
@@ -138,22 +130,11 @@ public class AttendanceCommandService {
                 .findByEmployeeIdAndWorkDate(employeeId, workDate)
                 .orElseGet(() -> AttendanceRecord.create(employeeId, workDate, shiftPatternId));
 
-        // コマンド実行前の打刻エントリ数を記録する（新規エントリ抽出用）
-        int entryCountBefore = record.getClockEntries().size();
-
         // 集約の出勤打刻コマンドを実行する（NOT_CLOCKED→CLOCKED_IN）
         record.clockIn(clockTime, source);
 
-        // 新規打刻エントリを保存前に抽出する
-        List<ClockEntry> newEntries = extractNewEntries(record.getClockEntries(), entryCountBefore);
-
-        // 集約をリポジトリに保存する
+        // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
-
-        // 新規打刻エントリを打刻テーブルに追記する
-        if (!newEntries.isEmpty()) {
-            clockEntryRepository.appendAll(saved.getId(), newEntries);
-        }
 
         // ドメインイベントを生成する
         ClockedInEvent event = ClockedInEvent.of(
@@ -190,13 +171,10 @@ public class AttendanceCommandService {
      * @param clockTime 退勤打刻時刻
      * @param source    打刻元（WEB/MOBILE）
      */
-    public void clockOut(AttendanceRecordId id, ClockTime clockTime, ClockSource source) {
+    public WorkDurationCalculator.CalculationResult clockOut(AttendanceRecordId id, ClockTime clockTime, ClockSource source) {
         // 勤怠記録を取得する
         AttendanceRecord record = findRecordOrThrow(id);
         log.debug("退勤打刻: attendanceId={}", id.value());
-
-        // コマンド実行前の打刻エントリ数を記録する
-        int entryCountBefore = record.getClockEntries().size();
 
         // 集約の退勤打刻コマンドを実行する（CLOCKED_IN→CLOCKED_OUT）
         record.clockOut(clockTime, source);
@@ -207,16 +185,8 @@ public class AttendanceCommandService {
         // 計算結果を集約に設定する
         record.calculateWorkDuration(calcResult.workDuration(), calcResult.overtimeDuration());
 
-        // 新規打刻エントリを保存前に抽出する
-        List<ClockEntry> newEntries = extractNewEntries(record.getClockEntries(), entryCountBefore);
-
-        // 集約をリポジトリに保存する
+        // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
-
-        // 新規打刻エントリを打刻テーブルに追記する
-        if (!newEntries.isEmpty()) {
-            clockEntryRepository.appendAll(saved.getId(), newEntries);
-        }
 
         // ClockedOutイベントを生成・保存・発行する
         ClockedOutEvent clockedOutEvent = ClockedOutEvent.of(
@@ -235,6 +205,9 @@ public class AttendanceCommandService {
 
         log.debug("退勤打刻完了: attendanceId={}, netWorkMinutes={}",
                 saved.getId().value(), calcResult.workDuration().netWorkMinutes());
+
+        // 計算結果をコントローラに返す（レスポンスDTO組み立て用）
+        return calcResult;
     }
 
     // ========================================
@@ -261,22 +234,11 @@ public class AttendanceCommandService {
         AttendanceRecord record = findRecordOrThrow(id);
         log.debug("休憩開始: attendanceId={}", id.value());
 
-        // コマンド実行前の打刻エントリ数を記録する
-        int entryCountBefore = record.getClockEntries().size();
-
         // 集約の休憩開始コマンドを実行する（ステータス変化なし）
         record.startBreak(clockTime, source);
 
-        // 新規打刻エントリを保存前に抽出する
-        List<ClockEntry> newEntries = extractNewEntries(record.getClockEntries(), entryCountBefore);
-
-        // 集約をリポジトリに保存する
+        // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
-
-        // 新規打刻エントリを打刻テーブルに追記する
-        if (!newEntries.isEmpty()) {
-            clockEntryRepository.appendAll(saved.getId(), newEntries);
-        }
 
         // BreakStartedイベントを生成・保存・発行する
         BreakStartedEvent event = BreakStartedEvent.of(
@@ -317,25 +279,14 @@ public class AttendanceCommandService {
         // 最後のBREAK_START時刻を取得する（休憩時間計算のため、コマンド実行前に取得）
         ClockTime lastBreakStart = findLatestTimeOfType(record.getClockEntries(), ClockType.BREAK_START);
 
-        // コマンド実行前の打刻エントリ数を記録する
-        int entryCountBefore = record.getClockEntries().size();
-
         // 集約の休憩終了コマンドを実行する（ステータス変化なし）
         record.endBreak(clockTime, source);
 
         // 今回の休憩時間（分）を算出する（BREAK_START → BREAK_END の差分）
         int breakMinutes = (int) Duration.between(lastBreakStart.value(), clockTime.value()).toMinutes();
 
-        // 新規打刻エントリを保存前に抽出する
-        List<ClockEntry> newEntries = extractNewEntries(record.getClockEntries(), entryCountBefore);
-
-        // 集約をリポジトリに保存する
+        // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
-
-        // 新規打刻エントリを打刻テーブルに追記する
-        if (!newEntries.isEmpty()) {
-            clockEntryRepository.appendAll(saved.getId(), newEntries);
-        }
 
         // BreakEndedイベントを生成・保存・発行する（breakMinutesを含む）
         BreakEndedEvent event = BreakEndedEvent.of(
@@ -375,9 +326,6 @@ public class AttendanceCommandService {
         // 修正前の打刻時刻を取得する（イベント記録用。修正実行前に取得する必要がある）
         ClockTime beforeTime = findLatestTimeOfType(record.getClockEntries(), correction.targetType());
 
-        // コマンド実行前の打刻エントリ数を記録する
-        int entryCountBefore = record.getClockEntries().size();
-
         // 集約の打刻修正コマンドを実行する（source=CORRECTIONの新エントリが追加される）
         record.correctClock(correction);
 
@@ -387,16 +335,8 @@ public class AttendanceCommandService {
             record.calculateWorkDuration(calcResult.workDuration(), calcResult.overtimeDuration());
         }
 
-        // 新規打刻エントリを保存前に抽出する
-        List<ClockEntry> newEntries = extractNewEntries(record.getClockEntries(), entryCountBefore);
-
-        // 集約をリポジトリに保存する
+        // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
-
-        // 新規打刻エントリを打刻テーブルに追記する
-        if (!newEntries.isEmpty()) {
-            clockEntryRepository.appendAll(saved.getId(), newEntries);
-        }
 
         // ClockCorrectedイベントを生成・保存・発行する
         ClockCorrectedEvent correctedEvent = ClockCorrectedEvent.of(
@@ -453,9 +393,6 @@ public class AttendanceCommandService {
                 .findByEmployeeIdAndWorkDate(employeeId, workDate)
                 .orElseGet(() -> AttendanceRecord.create(employeeId, workDate, shiftPatternId));
 
-        // コマンド実行前の打刻エントリ数を記録する
-        int entryCountBefore = record.getClockEntries().size();
-
         // 集約の手動勤務登録コマンドを実行する（出勤+退勤を一括登録、NOT_CLOCKED→CLOCKED_OUT）
         record.registerManualAttendance(manual);
 
@@ -465,16 +402,8 @@ public class AttendanceCommandService {
         // 計算結果を集約に設定する
         record.calculateWorkDuration(calcResult.workDuration(), calcResult.overtimeDuration());
 
-        // 新規打刻エントリを保存前に抽出する
-        List<ClockEntry> newEntries = extractNewEntries(record.getClockEntries(), entryCountBefore);
-
-        // 集約をリポジトリに保存する
+        // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
-
-        // 新規打刻エントリを打刻テーブルに追記する（出勤+退勤の2エントリ）
-        if (!newEntries.isEmpty()) {
-            clockEntryRepository.appendAll(saved.getId(), newEntries);
-        }
 
         // ManualAttendanceRegisteredイベントを生成・保存・発行する
         ManualAttendanceRegisteredEvent manualEvent = ManualAttendanceRegisteredEvent.of(
@@ -591,23 +520,6 @@ public class AttendanceCommandService {
     }
 
     /**
-     * 打刻エントリ一覧から新規追加分を抽出する
-     *
-     * <p>コマンド実行前のエントリ数（countBefore）以降のエントリが新規追加分。
-     * 保存前に抽出することで、リポジトリ実装に依存しない安全な取得を保証する。</p>
-     *
-     * @param allEntries  全打刻エントリ（コマンド実行後）
-     * @param countBefore コマンド実行前のエントリ数
-     * @return 新規追加されたエントリのリスト
-     */
-    private List<ClockEntry> extractNewEntries(List<ClockEntry> allEntries, int countBefore) {
-        if (countBefore >= allEntries.size()) {
-            return List.of();
-        }
-        return new ArrayList<>(allEntries.subList(countBefore, allEntries.size()));
-    }
-
-    /**
      * 指定種別の最新の打刻時刻を取得する（末尾から検索）
      *
      * <p>打刻修正（CORRECTION）がある場合は最後のエントリが有効な時刻となる。
@@ -646,7 +558,7 @@ public class AttendanceCommandService {
             String payloadJson = objectMapper.writeValueAsString(event);
             // イベントストアに追記する（INSERT ONLY）
             attendanceEventRepository.append(attendanceId, eventType, payloadJson, occurredAt);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException(
                     "イベントのJSON変換に失敗しました: eventType=" + eventType, e);
         }

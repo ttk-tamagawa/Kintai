@@ -11,8 +11,8 @@ import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ScheduleId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -323,7 +323,7 @@ public class WeeklyScheduleCommandService {
             String payloadJson = objectMapper.writeValueAsString(event);
             // イベントストアに追記する（INSERT ONLY）
             weeklyScheduleEventRepository.append(scheduleId, eventType, payloadJson, occurredAt);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException(
                     "イベントのJSON変換に失敗しました: eventType=" + eventType, e);
         }
