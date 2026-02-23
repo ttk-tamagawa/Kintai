@@ -33,10 +33,10 @@ import java.util.stream.Collectors;
  *
  * <p>対応イベント:
  * <ul>
- *   <li>ShiftAssignedEvent → INSERT: 新規サマリー作成</li>
+ *   <li>ShiftAssignedEvent → INSERT（新規）またはUPDATE（公開時ステータス更新）</li>
  *   <li>ShiftChangedEvent → UPDATE: 割当変更・ステータスをDRAFTに戻す</li>
  * </ul>
- * ※ PUBLISHED/UNPUBLISHEDイベントはアプリケーション層で定義後に追加予定</p>
+ * </p>
  */
 @Component
 public class WeeklyScheduleSummaryProjector {
@@ -63,7 +63,25 @@ public class WeeklyScheduleSummaryProjector {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(ShiftAssignedEvent event) {
-        log.debug("ShiftAssignedEvent受信: scheduleId={}", event.scheduleId().value());
+        log.debug("ShiftAssignedEvent受信: scheduleId={}, status={}",
+                event.scheduleId().value(), event.status());
+
+        // 既存のサマリーを検索する（公開時は既にINSERT済み）
+        WeeklyScheduleSummaryJpaEntity existing = entityManager.find(
+                WeeklyScheduleSummaryJpaEntity.class, event.scheduleId().value());
+
+        if (existing != null) {
+            // 既存サマリーあり → ステータス更新（DRAFT→PUBLISHED等）
+            existing.setStatus(event.status().name());
+            existing.setLastEventAt(event.occurredAt());
+            existing.setEventCount(existing.getEventCount() + 1);
+            existing.setUpdatedAt(Instant.now());
+            existing.setUpdatedBy(SYSTEM_USER);
+
+            log.debug("サマリーステータス更新完了: scheduleId={}, status={}",
+                    event.scheduleId().value(), event.status());
+            return;
+        }
 
         // 新規サマリーエンティティを作成する
         WeeklyScheduleSummaryJpaEntity entity = new WeeklyScheduleSummaryJpaEntity(
