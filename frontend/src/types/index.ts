@@ -115,15 +115,15 @@ export interface DailyAttendanceItem {
   status: AttendanceStatus;
 }
 
-/** 月次サマリーのKPI */
+/** 月次サマリーのKPI（APIレスポンスのフィールド名に準拠） */
 export interface MonthlySummaryKpi {
   totalWorkDays: number;
-  averageWorkDays: number;
+  avgWorkDays: number;
   totalWorkHours: number;
-  averageWorkHours: number;
+  avgWorkHours: number;
   totalOvertimeHours: number;
-  averageOvertimeHours: number;
-  totalPaidLeave: number;
+  avgOvertimeHours: number;
+  totalPaidLeaveUsed: number;
 }
 
 /** 月次サマリーの従業員行 */
@@ -134,19 +134,59 @@ export interface MonthlyEmployeeSummary {
   totalWorkHours: number;
   totalOvertimeHours: number;
   lateNightHours: number;
-  paidLeave: number;
+  paidLeaveUsed: number;
 }
 
-/** 部門ダッシュボードのKPI */
+/** 月次サマリーAPIのフルレスポンス */
+export interface MonthlySummaryResponse {
+  kpi: MonthlySummaryKpi;
+  content: MonthlyEmployeeSummary[];
+  page: PageInfo;
+}
+
+/** 部門ダッシュボードのKPI（APIレスポンスのフィールド名に準拠） */
 export interface DepartmentDashboardKpi {
-  averageOvertimeHours: number;
-  overtimeTrend: number;
-  violationCount: number;
+  avgOvertimeHours: number;
+  totalOvertimeAlertCount: number;
+  totalMissingClockCount: number;
+  avgAttendanceRate: number;
+}
+
+/** 部門別テーブルのアイテム */
+export interface DepartmentDashboardItem {
+  departmentId: string;
+  departmentName: string;
+  headCount: number;
+  avgOvertimeHours: number;
+  maxOvertimeHours: number;
+  overtimeAlertCount: number;
   missingClockCount: number;
   attendanceRate: number;
 }
 
-/** ページネーションレスポンス */
+/** 部門ダッシュボードAPIのフルレスポンス */
+export interface DepartmentDashboardResponse {
+  kpi: DepartmentDashboardKpi;
+  previousMonth: DepartmentDashboardKpi;
+  content: DepartmentDashboardItem[];
+  page: PageInfo;
+}
+
+/** ページ情報（APIレスポンス共通） */
+export interface PageInfo {
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+/** 日次勤怠一覧APIのフルレスポンス */
+export interface DailyAttendanceResponse {
+  content: DailyAttendanceItem[];
+  page: PageInfo;
+}
+
+/** ページネーションレスポンス（汎用） */
 export interface PaginatedResponse<T> {
   content: T[];
   totalElements: number;
