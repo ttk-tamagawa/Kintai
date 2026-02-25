@@ -21,6 +21,9 @@ export type ClockSource = "WEB" | "MOBILE" | "MANUAL" | "CORRECTION";
 /** シフトスケジュールステータス */
 export type ScheduleStatus = "DRAFT" | "PUBLISHED";
 
+/** 曜日キー（シフト割当のマップキー） */
+export type DayOfWeek = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+
 // ========================================
 // 認証関連
 // ========================================
@@ -199,9 +202,9 @@ export interface PaginatedResponse<T> {
 // シフト API レスポンス型
 // ========================================
 
-/** シフトパターン */
+/** シフトパターン（APIレスポンスのフィールド名に準拠） */
 export interface ShiftPattern {
-  id: string;
+  patternId: string;
   name: string;
   startTime: string;
   endTime: string;
@@ -211,20 +214,14 @@ export interface ShiftPattern {
   createdAt: string;
 }
 
-/** 週次スケジュール */
-export interface WeeklySchedule {
-  id: string;
+/** 週次スケジュール（カレンダー一覧用、APIレスポンスのフィールド名に準拠） */
+export interface ScheduleItem {
+  scheduleId: string;
   employeeId: string;
   employeeName: string;
   weekStartDate: string;
   status: ScheduleStatus;
-  monday: ShiftAssignment | null;
-  tuesday: ShiftAssignment | null;
-  wednesday: ShiftAssignment | null;
-  thursday: ShiftAssignment | null;
-  friday: ShiftAssignment | null;
-  saturday: ShiftAssignment | null;
-  sunday: ShiftAssignment | null;
+  assignments: Partial<Record<DayOfWeek, ShiftAssignment>>;
 }
 
 /** シフト割当（1日分） */
@@ -233,6 +230,18 @@ export interface ShiftAssignment {
   patternName: string;
   startTime: string;
   endTime: string;
+}
+
+/** シフトパターン一覧APIレスポンス */
+export interface ShiftPatternsResponse {
+  content: ShiftPattern[];
+  page: PageInfo;
+}
+
+/** シフトスケジュール一覧APIレスポンス */
+export interface ShiftSchedulesResponse {
+  content: ScheduleItem[];
+  page: PageInfo;
 }
 
 // ========================================
