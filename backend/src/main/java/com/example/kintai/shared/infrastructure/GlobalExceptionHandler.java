@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -127,6 +129,39 @@ public class GlobalExceptionHandler {
         problemDetail.setInstance(URI.create(request.getRequestURI()));
 
         return problemDetail;
+    }
+
+    /**
+     * アクセス拒否 → 403 Forbidden
+     *
+     * <p>@PreAuthorize 等のメソッドレベル認可で発生する AccessDeniedException を
+     * キャッチして RFC 7807 形式で 403 を返す。
+     * @ExceptionHandler(Exception.class) に先に捕捉されるのを防ぐ。</p>
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDeniedException(
+            AccessDeniedException ex, HttpServletRequest request) {
+        log.warn("アクセス拒否: URI={}", request.getRequestURI());
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, "この操作を行う権限がありません");
+        problemDetail.setTitle("Forbidden");
+        problemDetail.setType(URI.create("https://api.example.com/errors/forbidden"));
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
+
+        return problemDetail;
+    }
+
+    /**
+     * 認証エラー → 401 Unauthorized
+     *
+     * <p>AuthenticationException を @ExceptionHandler(Exception.class) に
+     * 先に捕捉されるのを防ぐため、明示的にキャッチして再スローする。
+     * 実際の処理は JwtAuthenticationEntryPoint が担当する。</p>
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthenticationException(AuthenticationException ex) throws Exception {
+        throw ex;
     }
 
     /**
