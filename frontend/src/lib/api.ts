@@ -45,8 +45,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("auth_token");
-        // 認証が実装されたらログインページへリダイレクトする
-        // window.location.href = "/login";
+        // 現在のパスがログインページでなければリダイレクトする
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);

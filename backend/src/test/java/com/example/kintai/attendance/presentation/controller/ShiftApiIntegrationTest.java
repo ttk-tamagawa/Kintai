@@ -5,6 +5,8 @@ import com.example.kintai.attendance.presentation.dto.ChangeScheduleRequest;
 import com.example.kintai.attendance.presentation.dto.DefinePatternRequest;
 import com.example.kintai.attendance.presentation.dto.PatternResponse;
 import com.example.kintai.attendance.presentation.dto.ScheduleResponse;
+import com.example.kintai.shared.infrastructure.AuthenticatedUser;
+import com.example.kintai.shared.infrastructure.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -66,6 +68,10 @@ class ShiftApiIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /** JWT トークン生成用 */
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     // パターンAPIのベースURL
     private static final String PATTERNS_URL = "/api/v1/shifts/patterns";
 
@@ -85,7 +91,18 @@ class ShiftApiIntegrationTest {
      * weekly_schedule_summaries → weekly_schedule_events → weekly_schedules → shift_patterns</p>
      */
     @BeforeEach
-    void cleanUp() {
+    void setUp() {
+        // テスト用JWTトークンを生成してリクエストインターセプターに設定する
+        String token = jwtTokenProvider.generateToken(new AuthenticatedUser(
+                "test@example.com", "emp-test", "dept-001", "テスト部", "テスト太郎",
+                List.of("EMPLOYEE", "MANAGER", "HR", "ADMIN")));
+        restTemplate.getRestTemplate().getInterceptors().clear();
+        restTemplate.getRestTemplate().getInterceptors().add((request, body, execution) -> {
+            request.getHeaders().add("Authorization", "Bearer " + token);
+            return execution.execute(request, body);
+        });
+
+        // テストデータをクリーンアップする
         jdbcTemplate.execute("DELETE FROM weekly_schedule_summaries");
         jdbcTemplate.execute("DELETE FROM weekly_schedule_events");
         jdbcTemplate.execute("DELETE FROM weekly_schedules");

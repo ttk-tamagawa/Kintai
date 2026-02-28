@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -54,7 +55,7 @@ import java.util.UUID;
  * <p>全エンドポイントはRead Model（CQRSの読み取り側）を参照する。
  * Write Model（集約）へのアクセスは行わない。</p>
  *
- * <p>認可: 現在は全リクエスト許可（5-1 JWT認証実装後にロール制御を追加予定）</p>
+ * <p>認可: today→EMPLOYEE, daily→EMPLOYEE/MANAGER/HR, monthly-summary→MANAGER/HR, department-dashboard→HR/ADMIN</p>
  */
 @RestController
 @RequestMapping("/api/v1/attendances")
@@ -83,6 +84,7 @@ public class AttendanceQueryController {
      * @return 当日の勤怠ステータス（200）、または未出勤（204）
      */
     @GetMapping("/today")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<TodayAttendanceResponse> getTodayAttendance(
             @RequestParam UUID employeeId) {
 
@@ -124,6 +126,7 @@ public class AttendanceQueryController {
      * @return ページネーション付き日次勤怠一覧
      */
     @GetMapping("/daily")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'HR')")
     public ResponseEntity<DailyAttendancePageResponse> getDailyAttendances(
             @RequestParam UUID employeeId,
             @RequestParam(required = false) LocalDate dateFrom,
@@ -167,6 +170,7 @@ public class AttendanceQueryController {
      * @return KPI + 従業員別テーブルの月次サマリー
      */
     @GetMapping("/monthly-summary")
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
     public ResponseEntity<MonthlySummaryResponse> getMonthlySummary(
             @RequestParam String departmentId,
             @RequestParam(required = false) Integer year,
@@ -210,6 +214,7 @@ public class AttendanceQueryController {
      * @return CSVファイル（UTF-8 BOM付き）
      */
     @GetMapping("/monthly-summary/export")
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
     public ResponseEntity<byte[]> exportMonthlySummary(
             @RequestParam String departmentId,
             @RequestParam(required = false) Integer year,
@@ -255,6 +260,7 @@ public class AttendanceQueryController {
      * @return KPI + 前月KPI + 部門別テーブルのダッシュボード
      */
     @GetMapping("/department-dashboard")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
     public ResponseEntity<DepartmentDashboardResponse> getDepartmentDashboard(
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) Integer year,
@@ -298,6 +304,7 @@ public class AttendanceQueryController {
      * @return CSVファイル（UTF-8 BOM付き）
      */
     @GetMapping("/department-dashboard/export")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
     public ResponseEntity<byte[]> exportDepartmentDashboard(
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) Integer year,

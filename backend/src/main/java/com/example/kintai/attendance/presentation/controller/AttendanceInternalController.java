@@ -23,6 +23,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,7 +44,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 呼び出される想定で、外部ユーザーが直接叩くことはない。
  * 将来的にサービス間認証（APIキー等）を導入予定。</p>
  *
- * <p>認可: 現在は全リクエスト許可（5-1 JWT認証実装後にサービス間認証を追加予定）</p>
+ * <p>認可: 全メソッド ADMIN ロール必須</p>
  */
 @RestController
 @RequestMapping("/api/v1/internal/attendances")
@@ -78,6 +79,7 @@ public class AttendanceInternalController {
      * @return 修正後の勤怠記録の状態
      */
     @PostMapping("/correct")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CorrectClockResponse> correctClock(
             @Valid @RequestBody CorrectClockRequest request) {
 
@@ -133,6 +135,7 @@ public class AttendanceInternalController {
      * @return 登録後の勤怠記録の状態（勤務時間計算済み）
      */
     @PostMapping("/register")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<RegisterManualAttendanceResponse> registerManualAttendance(
             @Valid @RequestBody RegisterManualAttendanceRequest request) {
 
@@ -190,6 +193,7 @@ public class AttendanceInternalController {
      * @return 確定後の勤怠記録の状態
      */
     @PostMapping("/finalize")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<FinalizeResponse> finalizeRecord(
             @Valid @RequestBody FinalizeRequest request) {
 

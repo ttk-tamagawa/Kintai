@@ -4,6 +4,8 @@ import com.example.kintai.attendance.presentation.dto.BreakEndResponse;
 import com.example.kintai.attendance.presentation.dto.BreakStartResponse;
 import com.example.kintai.attendance.presentation.dto.ClockInResponse;
 import com.example.kintai.attendance.presentation.dto.ClockOutResponse;
+import com.example.kintai.shared.infrastructure.AuthenticatedUser;
+import com.example.kintai.shared.infrastructure.JwtTokenProvider;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
@@ -15,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -50,6 +53,10 @@ class AttendanceCommandControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /** JWT トークン生成用 */
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     /** APIのベースパス */
     private static final String BASE_PATH = "/api/v1/attendances";
 
@@ -76,6 +83,21 @@ class AttendanceCommandControllerIntegrationTest {
      * 読み取りモデル（attendance_summaries）も合わせて削除する。</p>
      */
     @BeforeEach
+    void setUp() {
+        // テスト用JWTトークンを生成してリクエストインターセプターに設定する
+        String token = jwtTokenProvider.generateToken(new AuthenticatedUser(
+                "test@example.com", "emp-test", "dept-001", "テスト部", "テスト太郎",
+                List.of("EMPLOYEE", "MANAGER", "HR", "ADMIN")));
+        restTemplate.getRestTemplate().getInterceptors().clear();
+        restTemplate.getRestTemplate().getInterceptors().add((request, body, execution) -> {
+            request.getHeaders().add("Authorization", "Bearer " + token);
+            return execution.execute(request, body);
+        });
+
+        // テストデータをクリーンアップする
+        cleanUp();
+    }
+
     void cleanUp() {
         // テスト用従業員のデータをFK制約の子テーブルから順番に削除する
         UUID[] testEmployees = {

@@ -17,3 +17,8 @@ app:
   cors:
     allowed-origins:
       - http://localhost:3000
+  auth:
+    dev-login-enabled: true  # テスト用メールログイン有効化
+  jwt:
+    secret: test-secret-key-that-is-at-least-256-bits-long-for-hs256-signing
+    expiration-ms: 3600000  # 1時間

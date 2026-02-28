@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,7 +40,7 @@ import java.util.UUID;
  * クエリ系（一覧・詳細）はShiftPatternQueryServiceに委譲する。
  * コマンド実行後のレスポンスはクエリサービスで最新状態を再取得して返却する。</p>
  *
- * <p>認可: 現在は全リクエスト許可（5-1 JWT認証実装後にロール制御を追加予定）</p>
+ * <p>認可: POST/deactivate/reactivate→HR, GET→MANAGER/HR</p>
  */
 @RestController
 @RequestMapping("/api/v1/shifts/patterns")
@@ -79,6 +80,7 @@ public class ShiftPatternController {
      * @return 作成されたパターン情報（201 Created）
      */
     @PostMapping
+    @PreAuthorize("hasRole('HR')")
     public ResponseEntity<PatternResponse> definePattern(
             @Valid @RequestBody DefinePatternRequest request) {
 
@@ -114,6 +116,7 @@ public class ShiftPatternController {
      * @return パターン一覧（パターン名昇順）
      */
     @GetMapping
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
     public ResponseEntity<List<PatternResponse>> getPatterns(
             @RequestParam(required = false, defaultValue = "false") boolean activeOnly) {
 
@@ -142,6 +145,7 @@ public class ShiftPatternController {
      * @return パターン詳細
      */
     @GetMapping("/{patternId}")
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
     public ResponseEntity<PatternResponse> getPattern(@PathVariable UUID patternId) {
         log.debug("パターン詳細リクエスト受信: patternId={}", patternId);
 
@@ -170,6 +174,7 @@ public class ShiftPatternController {
      * @return 無効化後のパターン情報（isActive=false）
      */
     @PostMapping("/{patternId}/actions/deactivate")
+    @PreAuthorize("hasRole('HR')")
     public ResponseEntity<PatternResponse> deactivatePattern(@PathVariable UUID patternId) {
         log.debug("パターン無効化リクエスト受信: patternId={}", patternId);
 
@@ -201,6 +206,7 @@ public class ShiftPatternController {
      * @return 再有効化後のパターン情報（isActive=true）
      */
     @PostMapping("/{patternId}/actions/reactivate")
+    @PreAuthorize("hasRole('HR')")
     public ResponseEntity<PatternResponse> reactivatePattern(@PathVariable UUID patternId) {
         log.debug("パターン再有効化リクエスト受信: patternId={}", patternId);
 

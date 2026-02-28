@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,7 +53,7 @@ import java.util.UUID;
  * <p>assignments変換: APIは曜日名文字列（"MONDAY"等）でやり取りし、
  * コントローラーがDayOfWeek/ShiftPatternIdのドメイン型に変換する。</p>
  *
- * <p>認可: 現在は全リクエスト許可（5-1 JWT認証実装後にロール制御を追加予定）</p>
+ * <p>認可: POST/PUT/publish→MANAGER, GET→EMPLOYEE/MANAGER</p>
  */
 @RestController
 @RequestMapping("/api/v1/shifts/schedules")
@@ -93,6 +94,7 @@ public class WeeklyScheduleController {
      * @return 作成されたスケジュール情報（201 Created）
      */
     @PostMapping
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ScheduleResponse> assignSchedule(
             @Valid @RequestBody AssignScheduleRequest request) {
 
@@ -136,6 +138,7 @@ public class WeeklyScheduleController {
      * @return 変更後のスケジュール情報
      */
     @PutMapping("/{scheduleId}")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ScheduleResponse> changeSchedule(
             @PathVariable UUID scheduleId,
             @Valid @RequestBody ChangeScheduleRequest request) {
@@ -173,6 +176,7 @@ public class WeeklyScheduleController {
      * @return 公開後のスケジュール情報（status=PUBLISHED）
      */
     @PostMapping("/{scheduleId}/actions/publish")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ScheduleResponse> publishSchedule(@PathVariable UUID scheduleId) {
         log.debug("スケジュール公開リクエスト受信: scheduleId={}", scheduleId);
 
@@ -202,6 +206,7 @@ public class WeeklyScheduleController {
      * @return スケジュール一覧
      */
     @GetMapping
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER')")
     public ResponseEntity<List<ScheduleResponse>> getSchedules(
             @RequestParam UUID employeeId,
             @RequestParam(required = false) LocalDate from,
@@ -232,6 +237,7 @@ public class WeeklyScheduleController {
      * @return スケジュール詳細
      */
     @GetMapping("/{scheduleId}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER')")
     public ResponseEntity<ScheduleResponse> getSchedule(@PathVariable UUID scheduleId) {
         log.debug("スケジュール詳細リクエスト受信: scheduleId={}", scheduleId);
 

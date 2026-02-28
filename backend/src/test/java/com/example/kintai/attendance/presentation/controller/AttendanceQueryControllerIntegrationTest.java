@@ -5,6 +5,8 @@ import com.example.kintai.attendance.presentation.dto.DailyAttendancePageRespons
 import com.example.kintai.attendance.presentation.dto.DepartmentDashboardResponse;
 import com.example.kintai.attendance.presentation.dto.MonthlySummaryResponse;
 import com.example.kintai.attendance.presentation.dto.TodayAttendanceResponse;
+import com.example.kintai.shared.infrastructure.AuthenticatedUser;
+import com.example.kintai.shared.infrastructure.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,6 +25,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +60,10 @@ class AttendanceQueryControllerIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /** JWT トークン生成用 */
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     /** APIのベースURL */
     private static final String BASE_URL = "/api/v1/attendances";
 
@@ -67,7 +74,17 @@ class AttendanceQueryControllerIntegrationTest {
      * attendance_summaries → attendance_events → clock_entries → attendances の順。</p>
      */
     @BeforeEach
-    void cleanUp() {
+    void setUp() {
+        // テスト用JWTトークンを生成してリクエストインターセプターに設定する
+        String token = jwtTokenProvider.generateToken(new AuthenticatedUser(
+                "test@example.com", "emp-test", "dept-001", "テスト部", "テスト太郎",
+                List.of("EMPLOYEE", "MANAGER", "HR", "ADMIN")));
+        restTemplate.getRestTemplate().getInterceptors().clear();
+        restTemplate.getRestTemplate().getInterceptors().add((request, body, execution) -> {
+            request.getHeaders().add("Authorization", "Bearer " + token);
+            return execution.execute(request, body);
+        });
+
         // Read Modelテーブルをクリーンアップする
         jdbcTemplate.execute("DELETE FROM attendance_summaries");
         jdbcTemplate.execute("DELETE FROM monthly_attendance_summaries");

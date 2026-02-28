@@ -21,6 +21,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,7 +53,7 @@ import java.util.List;
  * </ol>
  * </p>
  *
- * <p>認可: 現在は全リクエスト許可（5-1 JWT認証実装後にロール制御を追加予定）</p>
+ * <p>認可: 全メソッド EMPLOYEE ロール必須</p>
  */
 @RestController
 @RequestMapping("/api/v1/attendances")
@@ -90,6 +91,7 @@ public class AttendanceCommandController {
      * @return 出勤打刻結果（勤怠記録ID、ステータス、出勤時刻等）
      */
     @PostMapping("/clock-in")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<ClockInResponse> clockIn(@Valid @RequestBody ClockActionRequest request) {
         log.debug("出勤打刻リクエスト受信: employeeId={}", request.employeeId());
 
@@ -138,6 +140,7 @@ public class AttendanceCommandController {
      * @return 退勤打刻結果（勤務時間、残業時間等を含む）
      */
     @PostMapping("/clock-out")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<ClockOutResponse> clockOut(@Valid @RequestBody ClockActionRequest request) {
         log.debug("退勤打刻リクエスト受信: employeeId={}", request.employeeId());
 
@@ -194,6 +197,7 @@ public class AttendanceCommandController {
      * @return 休憩開始結果（onBreak=true、休憩開始時刻）
      */
     @PostMapping("/break-start")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<BreakStartResponse> breakStart(@Valid @RequestBody ClockActionRequest request) {
         log.debug("休憩開始リクエスト受信: employeeId={}", request.employeeId());
 
@@ -240,6 +244,7 @@ public class AttendanceCommandController {
      * @return 休憩終了結果（onBreak=false、合計休憩時間）
      */
     @PostMapping("/break-end")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<BreakEndResponse> breakEnd(@Valid @RequestBody ClockActionRequest request) {
         log.debug("休憩終了リクエスト受信: employeeId={}", request.employeeId());
 
