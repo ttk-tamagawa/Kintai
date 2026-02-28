@@ -237,6 +237,15 @@ public class AttendanceRecord {
             );
         }
 
+        // INV-ATT-001: 退勤時刻は出勤時刻より後であること
+        ClockTime clockInTime = getEffectiveClockInTime();
+        if (clockInTime != null && !time.value().isAfter(clockInTime.value())) {
+            throw new IllegalStateException(
+                    "退勤時刻は出勤時刻より後である必要があります（INV-ATT-001）。出勤: "
+                            + clockInTime.value() + ", 退勤: " + time.value()
+            );
+        }
+
         // 退勤打刻エントリを追加
         clockEntries.add(new ClockEntry(ClockType.CLOCK_OUT, time, source));
 
@@ -274,6 +283,15 @@ public class AttendanceRecord {
             );
         }
 
+        // INV-ATT-002: 休憩開始時刻は出勤時刻より後であること
+        ClockTime clockInTime = getEffectiveClockInTime();
+        if (clockInTime != null && !time.value().isAfter(clockInTime.value())) {
+            throw new IllegalStateException(
+                    "休憩開始時刻は出勤時刻より後である必要があります（INV-ATT-002）。出勤: "
+                            + clockInTime.value() + ", 休憩開始: " + time.value()
+            );
+        }
+
         // 休憩開始エントリを追加（ステータスはCLOCKED_INのまま）
         clockEntries.add(new ClockEntry(ClockType.BREAK_START, time, source));
         updatedAt = Instant.now();
@@ -305,6 +323,15 @@ public class AttendanceRecord {
         if (!isOnBreak()) {
             throw new IllegalStateException(
                     "休憩を終了できません。現在休憩中ではありません（未終了のBREAK_STARTがありません）"
+            );
+        }
+
+        // INV-ATT-002: 休憩終了時刻は休憩開始時刻より後であること
+        ClockTime breakStartTime = getLastBreakStartTime();
+        if (breakStartTime != null && !time.value().isAfter(breakStartTime.value())) {
+            throw new IllegalStateException(
+                    "休憩終了時刻は休憩開始時刻より後である必要があります（INV-ATT-002）。休憩開始: "
+                            + breakStartTime.value() + ", 休憩終了: " + time.value()
             );
         }
 
@@ -355,6 +382,14 @@ public class AttendanceRecord {
         if (status != AttendanceStatus.NOT_CLOCKED) {
             throw new IllegalStateException(
                     "勤務実績を登録できません。現在のステータス: " + status + "（NOT_CLOCKEDである必要があります）"
+            );
+        }
+
+        // INV-ATT-001: 終了時刻は開始時刻より後であること
+        if (!manual.endTime().value().isAfter(manual.startTime().value())) {
+            throw new IllegalStateException(
+                    "勤務終了時刻は勤務開始時刻より後である必要があります（INV-ATT-001）。開始: "
+                            + manual.startTime().value() + ", 終了: " + manual.endTime().value()
             );
         }
 
@@ -425,6 +460,38 @@ public class AttendanceRecord {
     // ========================
     // ヘルパーメソッド
     // ========================
+
+    /**
+     * 有効な出勤時刻を取得する — 最後のCLOCK_INエントリの時刻を返す
+     *
+     * <p>打刻修正（CORRECTION）がある場合、最後に追加されたCLOCK_INエントリが
+     * 有効な出勤時刻となる。INV-ATT-001/002の検証に使用する。</p>
+     *
+     * @return 出勤時刻（CLOCK_INエントリがない場合はnull）
+     */
+    private ClockTime getEffectiveClockInTime() {
+        return clockEntries.stream()
+                .filter(entry -> entry.type() == ClockType.CLOCK_IN)
+                .reduce((first, second) -> second)
+                .map(ClockEntry::time)
+                .orElse(null);
+    }
+
+    /**
+     * 最後の休憩開始時刻を取得する — 最後のBREAK_STARTエントリの時刻を返す
+     *
+     * <p>INV-ATT-002の検証で、休憩終了時刻が休憩開始時刻より後であることを
+     * 確認するために使用する。</p>
+     *
+     * @return 最後の休憩開始時刻（BREAK_STARTエントリがない場合はnull）
+     */
+    private ClockTime getLastBreakStartTime() {
+        return clockEntries.stream()
+                .filter(entry -> entry.type() == ClockType.BREAK_START)
+                .reduce((first, second) -> second)
+                .map(ClockEntry::time)
+                .orElse(null);
+    }
 
     /**
      * 現在休憩中かどうかを判定する

@@ -296,6 +296,38 @@ class AttendanceRecordTest {
         }
 
         @Test
+        @DisplayName("退勤時刻が出勤時刻より前の場合にIllegalStateExceptionが発生する（INV-ATT-001）")
+        void shouldThrowWhenClockOutBeforeClockIn() {
+            // 出勤中の勤怠記録（09:00出勤）
+            AttendanceRecord record = createClockedInRecord();
+
+            // 出勤より前の時刻（08:00）で退勤 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.clockOut(clockTimeOf(8), TEST_SOURCE),
+                    "退勤時刻が出勤時刻より前の場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-001"),
+                    "エラーメッセージにINV-ATT-001が含まれること");
+        }
+
+        @Test
+        @DisplayName("退勤時刻が出勤時刻と同じ場合にIllegalStateExceptionが発生する（INV-ATT-001）")
+        void shouldThrowWhenClockOutEqualsClockIn() {
+            // 出勤中の勤怠記録（09:00出勤）
+            AttendanceRecord record = createClockedInRecord();
+
+            // 出勤と同じ時刻（09:00）で退勤 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.clockOut(clockTimeOf(9), TEST_SOURCE),
+                    "退勤時刻が出勤時刻と同じ場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-001"),
+                    "エラーメッセージにINV-ATT-001が含まれること");
+        }
+
+        @Test
         @DisplayName("NOT_CLOCKED状態から退勤打刻するとIllegalStateExceptionが発生する")
         void shouldThrowWhenClockOutFromNotClocked() {
             // 未打刻状態の勤怠記録
@@ -366,6 +398,38 @@ class AttendanceRecordTest {
 
             // 休憩中フラグの検証
             assertTrue(record.isOnBreak(), "休憩中であること");
+        }
+
+        @Test
+        @DisplayName("休憩開始時刻が出勤時刻より前の場合にIllegalStateExceptionが発生する（INV-ATT-002）")
+        void shouldThrowWhenStartBreakBeforeClockIn() {
+            // 出勤中の勤怠記録（09:00出勤）
+            AttendanceRecord record = createClockedInRecord();
+
+            // 出勤より前の時刻（08:00）で休憩開始 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.startBreak(clockTimeOf(8), TEST_SOURCE),
+                    "休憩開始時刻が出勤時刻より前の場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-002"),
+                    "エラーメッセージにINV-ATT-002が含まれること");
+        }
+
+        @Test
+        @DisplayName("休憩開始時刻が出勤時刻と同じ場合にIllegalStateExceptionが発生する（INV-ATT-002）")
+        void shouldThrowWhenStartBreakEqualsClockIn() {
+            // 出勤中の勤怠記録（09:00出勤）
+            AttendanceRecord record = createClockedInRecord();
+
+            // 出勤と同じ時刻（09:00）で休憩開始 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.startBreak(clockTimeOf(9), TEST_SOURCE),
+                    "休憩開始時刻が出勤時刻と同じ場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-002"),
+                    "エラーメッセージにINV-ATT-002が含まれること");
         }
 
         @Test
@@ -455,6 +519,40 @@ class AttendanceRecordTest {
 
             // 休憩中フラグの検証
             assertFalse(record.isOnBreak(), "休憩中でないこと");
+        }
+
+        @Test
+        @DisplayName("休憩終了時刻が休憩開始時刻より前の場合にIllegalStateExceptionが発生する（INV-ATT-002）")
+        void shouldThrowWhenEndBreakBeforeStartBreak() {
+            // 出勤中かつ休憩中の勤怠記録（09:00出勤、12:00休憩開始）
+            AttendanceRecord record = createClockedInRecord();
+            record.startBreak(clockTimeOf(12), TEST_SOURCE);
+
+            // 休憩開始より前の時刻（11:00）で休憩終了 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.endBreak(clockTimeOf(11), TEST_SOURCE),
+                    "休憩終了時刻が休憩開始時刻より前の場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-002"),
+                    "エラーメッセージにINV-ATT-002が含まれること");
+        }
+
+        @Test
+        @DisplayName("休憩終了時刻が休憩開始時刻と同じ場合にIllegalStateExceptionが発生する（INV-ATT-002）")
+        void shouldThrowWhenEndBreakEqualsStartBreak() {
+            // 出勤中かつ休憩中の勤怠記録（09:00出勤、12:00休憩開始）
+            AttendanceRecord record = createClockedInRecord();
+            record.startBreak(clockTimeOf(12), TEST_SOURCE);
+
+            // 休憩開始と同じ時刻（12:00）で休憩終了 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.endBreak(clockTimeOf(12), TEST_SOURCE),
+                    "休憩終了時刻が休憩開始時刻と同じ場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-002"),
+                    "エラーメッセージにINV-ATT-002が含まれること");
         }
 
         @Test
@@ -658,6 +756,44 @@ class AttendanceRecordTest {
             assertEquals(ClockType.CLOCK_OUT, clockOutEntry.type(), "2件目がCLOCK_OUTであること");
             assertEquals(endTime, clockOutEntry.time(), "退勤時刻が正しいこと");
             assertEquals(ClockSource.MANUAL, clockOutEntry.source(), "打刻元がMANUALであること");
+        }
+
+        @Test
+        @DisplayName("終了時刻が開始時刻より前の場合にIllegalStateExceptionが発生する（INV-ATT-001）")
+        void shouldThrowWhenManualEndTimeBeforeStartTime() {
+            // 未打刻状態の勤怠記録
+            AttendanceRecord record = createNewRecord();
+            ManualAttendance manual = new ManualAttendance(
+                    clockTimeOf(18), clockTimeOf(9), "通常勤務", "理由", testApprovalId()
+            );
+
+            // 終了時刻（09:00）が開始時刻（18:00）より前 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.registerManualAttendance(manual),
+                    "終了時刻が開始時刻より前の場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-001"),
+                    "エラーメッセージにINV-ATT-001が含まれること");
+        }
+
+        @Test
+        @DisplayName("終了時刻が開始時刻と同じ場合にIllegalStateExceptionが発生する（INV-ATT-001）")
+        void shouldThrowWhenManualEndTimeEqualsStartTime() {
+            // 未打刻状態の勤怠記録
+            AttendanceRecord record = createNewRecord();
+            ManualAttendance manual = new ManualAttendance(
+                    clockTimeOf(9), clockTimeOf(9), "通常勤務", "理由", testApprovalId()
+            );
+
+            // 終了時刻と開始時刻が同じ → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.registerManualAttendance(manual),
+                    "終了時刻が開始時刻と同じ場合に例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("INV-ATT-001"),
+                    "エラーメッセージにINV-ATT-001が含まれること");
         }
 
         @Test
