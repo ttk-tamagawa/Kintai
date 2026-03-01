@@ -239,7 +239,7 @@ public class WeeklyScheduleController {
      * @return スケジュール一覧
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER') and @accessControl.canAccessEmployee(authentication, #employeeId)")
     public ResponseEntity<List<ScheduleResponse>> getSchedules(
             @RequestParam UUID employeeId,
             @RequestParam(required = false) LocalDate from,

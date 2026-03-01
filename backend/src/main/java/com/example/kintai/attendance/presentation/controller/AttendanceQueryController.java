@@ -84,7 +84,7 @@ public class AttendanceQueryController {
      * @return 当日の勤怠ステータス（200）、または未出勤（204）
      */
     @GetMapping("/today")
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PreAuthorize("hasRole('EMPLOYEE') and @accessControl.canAccessEmployee(authentication, #employeeId)")
     public ResponseEntity<TodayAttendanceResponse> getTodayAttendance(
             @RequestParam UUID employeeId) {
 
@@ -126,7 +126,7 @@ public class AttendanceQueryController {
      * @return ページネーション付き日次勤怠一覧
      */
     @GetMapping("/daily")
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'HR')")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'HR') and @accessControl.canAccessEmployee(authentication, #employeeId)")
     public ResponseEntity<DailyAttendancePageResponse> getDailyAttendances(
             @RequestParam UUID employeeId,
             @RequestParam(required = false) LocalDate dateFrom,
@@ -170,7 +170,7 @@ public class AttendanceQueryController {
      * @return KPI + 従業員別テーブルの月次サマリー
      */
     @GetMapping("/monthly-summary")
-    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR') and @accessControl.canAccessDepartment(authentication, #departmentId)")
     public ResponseEntity<MonthlySummaryResponse> getMonthlySummary(
             @RequestParam String departmentId,
             @RequestParam(required = false) Integer year,
@@ -214,7 +214,7 @@ public class AttendanceQueryController {
      * @return CSVファイル（UTF-8 BOM付き）
      */
     @GetMapping("/monthly-summary/export")
-    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR') and @accessControl.canAccessDepartment(authentication, #departmentId)")
     public ResponseEntity<byte[]> exportMonthlySummary(
             @RequestParam String departmentId,
             @RequestParam(required = false) Integer year,

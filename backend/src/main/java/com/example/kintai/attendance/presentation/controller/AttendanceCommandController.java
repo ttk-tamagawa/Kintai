@@ -91,7 +91,7 @@ public class AttendanceCommandController {
      * @return 出勤打刻結果（勤怠記録ID、ステータス、出勤時刻等）
      */
     @PostMapping("/clock-in")
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PreAuthorize("hasRole('EMPLOYEE') and @accessControl.canAccessEmployee(authentication, #request.employeeId())")
     public ResponseEntity<ClockInResponse> clockIn(@Valid @RequestBody ClockActionRequest request) {
         log.debug("出勤打刻リクエスト受信: employeeId={}", request.employeeId());
 
@@ -140,7 +140,7 @@ public class AttendanceCommandController {
      * @return 退勤打刻結果（勤務時間、残業時間等を含む）
      */
     @PostMapping("/clock-out")
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PreAuthorize("hasRole('EMPLOYEE') and @accessControl.canAccessEmployee(authentication, #request.employeeId())")
     public ResponseEntity<ClockOutResponse> clockOut(@Valid @RequestBody ClockActionRequest request) {
         log.debug("退勤打刻リクエスト受信: employeeId={}", request.employeeId());
 
@@ -197,7 +197,7 @@ public class AttendanceCommandController {
      * @return 休憩開始結果（onBreak=true、休憩開始時刻）
      */
     @PostMapping("/break-start")
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PreAuthorize("hasRole('EMPLOYEE') and @accessControl.canAccessEmployee(authentication, #request.employeeId())")
     public ResponseEntity<BreakStartResponse> breakStart(@Valid @RequestBody ClockActionRequest request) {
         log.debug("休憩開始リクエスト受信: employeeId={}", request.employeeId());
 
@@ -244,7 +244,7 @@ public class AttendanceCommandController {
      * @return 休憩終了結果（onBreak=false、合計休憩時間）
      */
     @PostMapping("/break-end")
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PreAuthorize("hasRole('EMPLOYEE') and @accessControl.canAccessEmployee(authentication, #request.employeeId())")
     public ResponseEntity<BreakEndResponse> breakEnd(@Valid @RequestBody ClockActionRequest request) {
         log.debug("休憩終了リクエスト受信: employeeId={}", request.employeeId());
 

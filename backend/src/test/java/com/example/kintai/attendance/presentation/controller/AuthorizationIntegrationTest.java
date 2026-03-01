@@ -138,6 +138,27 @@ class AuthorizationIntegrationTest {
     }
 
     /**
+     * 指定のemployeeId・departmentId・ロールでJWTトークンを含むHTTPヘッダーを生成する
+     *
+     * <p>自己データアクセス制御のテスト用。リクエストの employeeId と JWT の employeeId を
+     * 一致/不一致にすることで、データレベルの認可を検証する。</p>
+     *
+     * @param employeeId   JWTに含める従業員ID
+     * @param departmentId JWTに含める部門ID
+     * @param roles        付与するロール一覧
+     * @return Authorization ヘッダー付きの HttpHeaders
+     */
+    private HttpHeaders headersWithRolesAndEmployee(String employeeId, String departmentId, String... roles) {
+        String token = jwtTokenProvider.generateToken(new AuthenticatedUser(
+                "test@example.com", employeeId, departmentId, "テスト部", "テスト太郎",
+                List.of(roles)));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token);
+        return headers;
+    }
+
+    /**
      * 認証なし（JWTなし）のHTTPヘッダーを生成する
      */
     private HttpHeaders headersWithoutAuth() {
@@ -225,8 +246,10 @@ class AuthorizationIntegrationTest {
         @Test
         @DisplayName("POST /clock-in — EMPLOYEE → 認可通過（403以外）")
         void clockIn_employee_allowed() {
+            // JWTのemployeeIdとリクエストのemployeeIdを一致させる（自己データアクセス制御対応）
             HttpStatusCode status = post("/api/v1/attendances/clock-in",
-                    CLOCK_REQUEST, headersWithRoles("EMPLOYEE"));
+                    CLOCK_REQUEST, headersWithRolesAndEmployee(
+                            "00000000-0000-0000-0000-000000000001", "dept-001", "EMPLOYEE"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -255,8 +278,10 @@ class AuthorizationIntegrationTest {
         @Test
         @DisplayName("POST /clock-out — EMPLOYEE → 認可通過")
         void clockOut_employee_allowed() {
+            // JWTのemployeeIdとリクエストのemployeeIdを一致させる（自己データアクセス制御対応）
             HttpStatusCode status = post("/api/v1/attendances/clock-out",
-                    CLOCK_REQUEST, headersWithRoles("EMPLOYEE"));
+                    CLOCK_REQUEST, headersWithRolesAndEmployee(
+                            "00000000-0000-0000-0000-000000000001", "dept-001", "EMPLOYEE"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -271,8 +296,10 @@ class AuthorizationIntegrationTest {
         @Test
         @DisplayName("POST /break-start — EMPLOYEE → 認可通過")
         void breakStart_employee_allowed() {
+            // JWTのemployeeIdとリクエストのemployeeIdを一致させる（自己データアクセス制御対応）
             HttpStatusCode status = post("/api/v1/attendances/break-start",
-                    CLOCK_REQUEST, headersWithRoles("EMPLOYEE"));
+                    CLOCK_REQUEST, headersWithRolesAndEmployee(
+                            "00000000-0000-0000-0000-000000000001", "dept-001", "EMPLOYEE"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -287,8 +314,10 @@ class AuthorizationIntegrationTest {
         @Test
         @DisplayName("POST /break-end — EMPLOYEE → 認可通過")
         void breakEnd_employee_allowed() {
+            // JWTのemployeeIdとリクエストのemployeeIdを一致させる（自己データアクセス制御対応）
             HttpStatusCode status = post("/api/v1/attendances/break-end",
-                    CLOCK_REQUEST, headersWithRoles("EMPLOYEE"));
+                    CLOCK_REQUEST, headersWithRolesAndEmployee(
+                            "00000000-0000-0000-0000-000000000001", "dept-001", "EMPLOYEE"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -314,9 +343,11 @@ class AuthorizationIntegrationTest {
         @Test
         @DisplayName("GET /today — EMPLOYEE → 認可通過")
         void today_employee_allowed() {
+            // JWTのemployeeIdとURLのemployeeIdを一致させる（自己データアクセス制御対応）
             HttpStatusCode status = get(
                     "/api/v1/attendances/today?employeeId=00000000-0000-0000-0000-000000000001",
-                    headersWithRoles("EMPLOYEE"));
+                    headersWithRolesAndEmployee(
+                            "00000000-0000-0000-0000-000000000001", "dept-001", "EMPLOYEE"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -334,9 +365,11 @@ class AuthorizationIntegrationTest {
         @Test
         @DisplayName("GET /daily — EMPLOYEE → 認可通過")
         void daily_employee_allowed() {
+            // JWTのemployeeIdとURLのemployeeIdを一致させる（自己データアクセス制御対応）
             HttpStatusCode status = get(
                     "/api/v1/attendances/daily?employeeId=00000000-0000-0000-0000-000000000001&date=2026-02-28",
-                    headersWithRoles("EMPLOYEE"));
+                    headersWithRolesAndEmployee(
+                            "00000000-0000-0000-0000-000000000001", "dept-001", "EMPLOYEE"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -748,8 +781,10 @@ class AuthorizationIntegrationTest {
         @Test
         @DisplayName("GET /schedules — EMPLOYEE → 認可通過")
         void getSchedules_employee_allowed() {
+            // JWTのemployeeIdとURLのemployeeIdを一致させる（自己データアクセス制御対応）
             HttpStatusCode status = get("/api/v1/shifts/schedules?employeeId=00000000-0000-0000-0000-000000000001",
-                    headersWithRoles("EMPLOYEE"));
+                    headersWithRolesAndEmployee(
+                            "00000000-0000-0000-0000-000000000001", "dept-001", "EMPLOYEE"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -788,6 +823,144 @@ class AuthorizationIntegrationTest {
             assertEquals(HttpStatus.FORBIDDEN, get(
                     "/api/v1/shifts/schedules/00000000-0000-0000-0000-000000000001",
                     headersWithRoles("HR")));
+        }
+    }
+
+    // ========================================
+    // 自己データアクセス制御テスト — EMPLOYEE/MANAGERのデータレベル認可
+    // ========================================
+
+    @Nested
+    @DisplayName("自己データアクセス制御 — データレベルの認可検証")
+    class SelfDataAccessTests {
+
+        /** テスト用の共通employeeId（リクエストで使用するID） */
+        private static final String TARGET_EMPLOYEE_ID = "00000000-0000-0000-0000-000000000001";
+        /** テスト用の別employeeId（JWT側に設定して不一致を作る） */
+        private static final String OTHER_EMPLOYEE_ID = "00000000-0000-0000-0000-000000000099";
+
+        // --- EMPLOYEE: 他人のemployeeIdで打刻 → 403 ---
+
+        @Test
+        @DisplayName("POST /clock-in — EMPLOYEE が他人のemployeeIdで打刻 → 403")
+        void clockIn_employee_otherEmployeeId_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN,
+                    post("/api/v1/attendances/clock-in", CLOCK_REQUEST,
+                            headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "EMPLOYEE")));
+        }
+
+        @Test
+        @DisplayName("POST /clock-out — EMPLOYEE が他人のemployeeIdで打刻 → 403")
+        void clockOut_employee_otherEmployeeId_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN,
+                    post("/api/v1/attendances/clock-out", CLOCK_REQUEST,
+                            headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "EMPLOYEE")));
+        }
+
+        @Test
+        @DisplayName("POST /break-start — EMPLOYEE が他人のemployeeIdで打刻 → 403")
+        void breakStart_employee_otherEmployeeId_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN,
+                    post("/api/v1/attendances/break-start", CLOCK_REQUEST,
+                            headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "EMPLOYEE")));
+        }
+
+        @Test
+        @DisplayName("POST /break-end — EMPLOYEE が他人のemployeeIdで打刻 → 403")
+        void breakEnd_employee_otherEmployeeId_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN,
+                    post("/api/v1/attendances/break-end", CLOCK_REQUEST,
+                            headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "EMPLOYEE")));
+        }
+
+        // --- EMPLOYEE: 他人のemployeeIdでクエリ → 403 ---
+
+        @Test
+        @DisplayName("GET /today — EMPLOYEE が他人のemployeeIdで取得 → 403")
+        void today_employee_otherEmployeeId_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN, get(
+                    "/api/v1/attendances/today?employeeId=" + TARGET_EMPLOYEE_ID,
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "EMPLOYEE")));
+        }
+
+        @Test
+        @DisplayName("GET /daily — EMPLOYEE が他人のemployeeIdで取得 → 403")
+        void daily_employee_otherEmployeeId_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN, get(
+                    "/api/v1/attendances/daily?employeeId=" + TARGET_EMPLOYEE_ID,
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "EMPLOYEE")));
+        }
+
+        @Test
+        @DisplayName("GET /schedules — EMPLOYEE が他人のemployeeIdで取得 → 403")
+        void getSchedules_employee_otherEmployeeId_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN, get(
+                    "/api/v1/shifts/schedules?employeeId=" + TARGET_EMPLOYEE_ID,
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "EMPLOYEE")));
+        }
+
+        // --- MANAGER: 他人のemployeeIdでクエリ → 認可通過（MANAGERはemployeeId制限なし） ---
+
+        @Test
+        @DisplayName("GET /daily — MANAGER が他人のemployeeIdで取得 → 認可通過")
+        void daily_manager_otherEmployeeId_allowed() {
+            HttpStatusCode status = get(
+                    "/api/v1/attendances/daily?employeeId=" + TARGET_EMPLOYEE_ID,
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "MANAGER"));
+            assertNotEquals(HttpStatus.FORBIDDEN, status);
+            assertNotEquals(HttpStatus.UNAUTHORIZED, status);
+        }
+
+        @Test
+        @DisplayName("GET /schedules — MANAGER が他人のemployeeIdで取得 → 認可通過")
+        void getSchedules_manager_otherEmployeeId_allowed() {
+            HttpStatusCode status = get(
+                    "/api/v1/shifts/schedules?employeeId=" + TARGET_EMPLOYEE_ID,
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "MANAGER"));
+            assertNotEquals(HttpStatus.FORBIDDEN, status);
+            assertNotEquals(HttpStatus.UNAUTHORIZED, status);
+        }
+
+        // --- MANAGER: 他部署のdepartmentIdで月次サマリー → 403 ---
+
+        @Test
+        @DisplayName("GET /monthly-summary — MANAGER が他部署のdepartmentIdで取得 → 403")
+        void monthlySummary_manager_otherDepartment_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN, get(
+                    "/api/v1/attendances/monthly-summary?departmentId=dept-999",
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "MANAGER")));
+        }
+
+        @Test
+        @DisplayName("GET /monthly-summary/export — MANAGER が他部署のdepartmentIdでエクスポート → 403")
+        void monthlySummaryExport_manager_otherDepartment_forbidden() {
+            assertEquals(HttpStatus.FORBIDDEN, get(
+                    "/api/v1/attendances/monthly-summary/export?departmentId=dept-999",
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "MANAGER")));
+        }
+
+        // --- MANAGER: 自部署のdepartmentIdで月次サマリー → 認可通過 ---
+
+        @Test
+        @DisplayName("GET /monthly-summary — MANAGER が自部署のdepartmentIdで取得 → 認可通過")
+        void monthlySummary_manager_ownDepartment_allowed() {
+            HttpStatusCode status = get(
+                    "/api/v1/attendances/monthly-summary?departmentId=dept-001",
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "MANAGER"));
+            assertNotEquals(HttpStatus.FORBIDDEN, status);
+            assertNotEquals(HttpStatus.UNAUTHORIZED, status);
+        }
+
+        // --- HR: 他部署のdepartmentIdで月次サマリー → 認可通過（HRは全部署OK） ---
+
+        @Test
+        @DisplayName("GET /monthly-summary — HR が他部署のdepartmentIdで取得 → 認可通過")
+        void monthlySummary_hr_otherDepartment_allowed() {
+            HttpStatusCode status = get(
+                    "/api/v1/attendances/monthly-summary?departmentId=dept-999",
+                    headersWithRolesAndEmployee(OTHER_EMPLOYEE_ID, "dept-001", "HR"));
+            assertNotEquals(HttpStatus.FORBIDDEN, status);
+            assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
     }
 
