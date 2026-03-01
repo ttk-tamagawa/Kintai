@@ -41,6 +41,7 @@ import java.util.UUID;
  *   <li>POST /api/v1/shifts/schedules — スケジュール割当（5-7-1）</li>
  *   <li>PUT /api/v1/shifts/schedules/{scheduleId} — スケジュール変更（5-7-2）</li>
  *   <li>POST /api/v1/shifts/schedules/{scheduleId}/actions/publish — スケジュール公開（5-7-3）</li>
+ *   <li>POST /api/v1/shifts/schedules/{scheduleId}/actions/unpublish — スケジュール非公開（5-7-3b）</li>
  *   <li>GET /api/v1/shifts/schedules — スケジュール一覧（5-7-4）</li>
  *   <li>GET /api/v1/shifts/schedules/{scheduleId} — スケジュール詳細（5-7-5）</li>
  * </ul>
@@ -187,6 +188,38 @@ public class WeeklyScheduleController {
         ScheduleSummary summary = queryService.getSchedule(scheduleId);
 
         log.debug("スケジュール公開完了: scheduleId={}", scheduleId);
+        return ResponseEntity.ok(toScheduleResponse(summary));
+    }
+
+    // ========================================
+    // POST /{scheduleId}/actions/unpublish — スケジュール非公開（5-7-3b）
+    // ========================================
+
+    /**
+     * 週次スケジュールを非公開にする
+     *
+     * <p>処理フロー:
+     * <ol>
+     *   <li>コマンドサービスで非公開を実行する（PUBLISHEDガード含む）</li>
+     *   <li>非公開後のスケジュールをクエリサービスで再取得してレスポンスを組み立てる</li>
+     * </ol>
+     * </p>
+     *
+     * @param scheduleId スケジュールID（パスパラメータ）
+     * @return 非公開後のスケジュール情報（status=DRAFT）
+     */
+    @PostMapping("/{scheduleId}/actions/unpublish")
+    @PreAuthorize("hasRole('MANAGER')")
+    public ResponseEntity<ScheduleResponse> unpublishSchedule(@PathVariable UUID scheduleId) {
+        log.debug("スケジュール非公開リクエスト受信: scheduleId={}", scheduleId);
+
+        // コマンドサービスで非公開を実行する（PUBLISHED→DRAFT）
+        commandService.unpublishSchedule(ScheduleId.of(scheduleId));
+
+        // 非公開後のスケジュールをクエリサービスで再取得する（Read Modelのステータスが更新済み）
+        ScheduleSummary summary = queryService.getSchedule(scheduleId);
+
+        log.debug("スケジュール非公開完了: scheduleId={}", scheduleId);
         return ResponseEntity.ok(toScheduleResponse(summary));
     }
 

@@ -3,6 +3,8 @@ package com.example.kintai.attendance.application.command;
 import com.example.kintai.attendance.domain.model.shift.ScheduleStatus;
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
+import com.example.kintai.attendance.domain.model.shift.event.SchedulePublishedEvent;
+import com.example.kintai.attendance.domain.model.shift.event.ScheduleUnpublishedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftAssignedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftChangedEvent;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
@@ -42,6 +44,7 @@ import java.util.Map;
  *   <li>UC-SH-004: シフトスケジュールを割り当てる（assignSchedule）</li>
  *   <li>UC-SH-005: シフトスケジュールを変更する（changeSchedule）</li>
  *   <li>UC-SH-006: シフトスケジュールを公開する（publishSchedule）</li>
+ *   <li>UC-SH-007: シフトスケジュールを非公開にする（unpublishSchedule）</li>
  * </ul>
  * </p>
  */
@@ -220,7 +223,7 @@ public class WeeklyScheduleCommandService {
      *   <li>集約のpublish()を呼び出す（ガード: DRAFTであること）</li>
      *   <li>リポジトリに保存する</li>
      *   <li>PUBLISHEDイベントをイベントストアに追記する</li>
-     *   <li>ShiftAssignedEventを発行する（ステータスPUBLISHEDで再利用、プロジェクターがRead Modelを更新）</li>
+     *   <li>SchedulePublishedEventを発行する（プロジェクターがRead Modelを更新）</li>
      * </ol>
      * </p>
      *
@@ -242,11 +245,9 @@ public class WeeklyScheduleCommandService {
         // リポジトリに保存する（楽観的ロックでバージョン管理）
         weeklyScheduleRepository.save(schedule);
 
-        // ShiftAssignedEventをPUBLISHEDステータスで再利用して生成する
-        // ※ プロジェクターがステータス更新を処理する
-        ShiftAssignedEvent event = ShiftAssignedEvent.of(
-                schedule.getId(), schedule.getEmployeeId(), schedule.getWeekStartDate(),
-                schedule.getAssignments(), schedule.getStatus()
+        // SchedulePublishedEventを生成する（専用の公開イベント）
+        SchedulePublishedEvent event = SchedulePublishedEvent.of(
+                schedule.getId(), schedule.getEmployeeId(), schedule.getWeekStartDate()
         );
 
         // イベントストアに追記する（INSERT ONLY）
@@ -256,6 +257,53 @@ public class WeeklyScheduleCommandService {
         eventPublisher.publishEvent(event);
 
         log.debug("スケジュール公開完了: scheduleId={}", scheduleId.value());
+    }
+
+    // ========================================
+    // UC-SH-007: シフトスケジュールを非公開にする
+    // ========================================
+
+    /**
+     * 週次スケジュールを非公開にする
+     *
+     * <p>処理フロー:
+     * <ol>
+     *   <li>スケジュールをリポジトリから取得する（存在しなければ例外）</li>
+     *   <li>集約のunpublish()を呼び出す（ガード: PUBLISHEDであること）</li>
+     *   <li>リポジトリに保存する</li>
+     *   <li>UNPUBLISHEDイベントをイベントストアに追記する</li>
+     *   <li>ScheduleUnpublishedEventを発行する（プロジェクターがRead Modelを更新）</li>
+     * </ol>
+     * </p>
+     *
+     * @param scheduleId 非公開対象のスケジュールID
+     * @throws IllegalArgumentException スケジュールが見つからない場合
+     * @throws IllegalStateException    PUBLISHEDでない場合
+     */
+    public void unpublishSchedule(ScheduleId scheduleId) {
+        log.debug("スケジュール非公開: scheduleId={}", scheduleId.value());
+
+        // スケジュールをリポジトリから取得する（存在しなければ例外）
+        WeeklySchedule schedule = findScheduleOrThrow(scheduleId);
+
+        // 集約のunpublish()を呼び出す（ガード: PUBLISHEDであること → DRAFT に遷移）
+        schedule.unpublish();
+
+        // リポジトリに保存する（楽観的ロックでバージョン管理）
+        weeklyScheduleRepository.save(schedule);
+
+        // ScheduleUnpublishedEventを生成する（専用の非公開イベント）
+        ScheduleUnpublishedEvent event = ScheduleUnpublishedEvent.of(
+                schedule.getId(), schedule.getEmployeeId(), schedule.getWeekStartDate()
+        );
+
+        // イベントストアに追記する（INSERT ONLY）
+        persistEvent(schedule.getId(), "UNPUBLISHED", event, event.occurredAt());
+
+        // Springイベントとして発行する（プロジェクターがRead ModelのステータスをDRAFTに更新）
+        eventPublisher.publishEvent(event);
+
+        log.debug("スケジュール非公開完了: scheduleId={}", scheduleId.value());
     }
 
     // ========================================
@@ -312,7 +360,7 @@ public class WeeklyScheduleCommandService {
      * weekly_schedule_eventsテーブルにINSERTする。</p>
      *
      * @param scheduleId スケジュールID
-     * @param eventType  イベント種別（ASSIGNED, CHANGED, PUBLISHED）
+     * @param eventType  イベント種別（ASSIGNED, CHANGED, PUBLISHED, UNPUBLISHED）
      * @param event      ドメインイベントオブジェクト
      * @param occurredAt イベント発生日時
      */

@@ -210,6 +210,27 @@ public class WeeklySchedule {
         updatedAt = Instant.now();
     }
 
+    /**
+     * スケジュールを非公開にする
+     *
+     * <p>ガード条件: ステータスがPUBLISHEDであること。
+     * 非公開にするとステータスがDRAFTに戻り、再公開が必要になる。</p>
+     *
+     * @throws IllegalStateException PUBLISHEDでない場合
+     */
+    public void unpublish() {
+        // ガード条件: PUBLISHEDであることを確認
+        if (status != ScheduleStatus.PUBLISHED) {
+            throw new IllegalStateException(
+                    "スケジュールを非公開にできません。現在のステータス: " + status + "（PUBLISHEDである必要があります）"
+            );
+        }
+
+        // ステータスをDRAFTに戻す
+        status = ScheduleStatus.DRAFT;
+        updatedAt = Instant.now();
+    }
+
     // ========================
     // ゲッター
     // ========================

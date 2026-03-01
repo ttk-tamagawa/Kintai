@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>assign() — 新規スケジュール作成のファクトリメソッド</li>
  *   <li>changeAssignments() — 割当変更コマンド</li>
  *   <li>publish() — 公開コマンド</li>
+ *   <li>unpublish() — 非公開コマンド</li>
  *   <li>getAssignments() — 不変コレクション返却の検証</li>
  *   <li>フルフロー — assign → changeAssignments → publish の一連フロー</li>
  * </ul>
@@ -378,6 +379,54 @@ class WeeklyScheduleTest {
     }
 
     // ========================
+    // unpublish() テスト
+    // ========================
+
+    @Nested
+    @DisplayName("unpublish() - スケジュール非公開")
+    class UnpublishTest {
+
+        @Test
+        @DisplayName("正常系: PUBLISHED状態からDRAFTに遷移する")
+        void unpublish_正常系_PUBLISHEDからDRAFTに遷移() {
+            // テストデータ準備: PUBLISHED状態のスケジュール
+            WeeklySchedule schedule = createPublishedSchedule();
+            assertEquals(ScheduleStatus.PUBLISHED, schedule.getStatus(), "非公開前はPUBLISHED");
+
+            // 実行: スケジュールを非公開にする
+            schedule.unpublish();
+
+            // 検証: DRAFTに遷移していること
+            assertEquals(
+                    ScheduleStatus.DRAFT,
+                    schedule.getStatus(),
+                    "非公開後はDRAFTに遷移していること"
+            );
+        }
+
+        @Test
+        @DisplayName("異常系: DRAFT状態で非公開にするとIllegalStateExceptionが発生する")
+        void unpublish_異常系_DRAFT状態で非公開にするとIllegalStateException() {
+            // テストデータ準備: DRAFT状態のスケジュール
+            WeeklySchedule schedule = createDraftSchedule();
+            assertEquals(ScheduleStatus.DRAFT, schedule.getStatus(), "既にDRAFT");
+
+            // 実行・検証: DRAFT状態で非公開にすると例外が発生すること
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> schedule.unpublish(),
+                    "DRAFT状態で非公開にするとIllegalStateExceptionが発生すること"
+            );
+
+            // エラーメッセージにステータス情報が含まれていること
+            assertTrue(
+                    exception.getMessage().contains("PUBLISHED"),
+                    "エラーメッセージに「PUBLISHED」が含まれること: " + exception.getMessage()
+            );
+        }
+    }
+
+    // ========================
     // getAssignments() 不変性テスト
     // ========================
 
@@ -475,6 +524,26 @@ class WeeklyScheduleTest {
             schedule.changeAssignments(newAssignments);
             assertEquals(ScheduleStatus.DRAFT, schedule.getStatus(), "Step2: DRAFTに戻った");
             assertEquals(1, schedule.getAssignments().size(), "Step2: 1日分の割当に変更");
+
+            // Step 3: 再公開
+            schedule.publish();
+            assertEquals(ScheduleStatus.PUBLISHED, schedule.getStatus(), "Step3: 再びPUBLISHED状態");
+        }
+
+        @Test
+        @DisplayName("assign → publish → unpublish → publish の公開・非公開サイクルが成功する")
+        void fullFlow_assign_publish_unpublish_republish_成功() {
+            // Step 1: 新規スケジュール作成して公開
+            WeeklySchedule schedule = WeeklySchedule.assign(
+                    testEmployeeId(), mondayDate(), weekdayAssignments()
+            );
+            schedule.publish();
+            assertEquals(ScheduleStatus.PUBLISHED, schedule.getStatus(), "Step1: PUBLISHED状態");
+
+            // Step 2: 非公開にする（DRAFTに戻る）
+            schedule.unpublish();
+            assertEquals(ScheduleStatus.DRAFT, schedule.getStatus(), "Step2: DRAFTに戻った");
+            assertEquals(5, schedule.getAssignments().size(), "Step2: 割当数は変わらず5日分");
 
             // Step 3: 再公開
             schedule.publish();

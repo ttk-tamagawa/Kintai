@@ -1,5 +1,7 @@
 package com.example.kintai.attendance.infrastructure.projector;
 
+import com.example.kintai.attendance.domain.model.shift.event.SchedulePublishedEvent;
+import com.example.kintai.attendance.domain.model.shift.event.ScheduleUnpublishedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftAssignedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftChangedEvent;
 import com.example.kintai.attendance.infrastructure.persistence.entity.ShiftPatternJpaEntity;
@@ -33,8 +35,10 @@ import java.util.stream.Collectors;
  *
  * <p>対応イベント:
  * <ul>
- *   <li>ShiftAssignedEvent → INSERT（新規）またはUPDATE（公開時ステータス更新）</li>
+ *   <li>ShiftAssignedEvent → INSERT: 新規サマリー作成</li>
  *   <li>ShiftChangedEvent → UPDATE: 割当変更・ステータスをDRAFTに戻す</li>
+ *   <li>SchedulePublishedEvent → UPDATE: ステータスをPUBLISHEDに更新</li>
+ *   <li>ScheduleUnpublishedEvent → UPDATE: ステータスをDRAFTに更新</li>
  * </ul>
  * </p>
  */
@@ -65,23 +69,6 @@ public class WeeklyScheduleSummaryProjector {
     public void on(ShiftAssignedEvent event) {
         log.debug("ShiftAssignedEvent受信: scheduleId={}, status={}",
                 event.scheduleId().value(), event.status());
-
-        // 既存のサマリーを検索する（公開時は既にINSERT済み）
-        WeeklyScheduleSummaryJpaEntity existing = entityManager.find(
-                WeeklyScheduleSummaryJpaEntity.class, event.scheduleId().value());
-
-        if (existing != null) {
-            // 既存サマリーあり → ステータス更新（DRAFT→PUBLISHED等）
-            existing.setStatus(event.status().name());
-            existing.setLastEventAt(event.occurredAt());
-            existing.setEventCount(existing.getEventCount() + 1);
-            existing.setUpdatedAt(Instant.now());
-            existing.setUpdatedBy(SYSTEM_USER);
-
-            log.debug("サマリーステータス更新完了: scheduleId={}, status={}",
-                    event.scheduleId().value(), event.status());
-            return;
-        }
 
         // 新規サマリーエンティティを作成する
         WeeklyScheduleSummaryJpaEntity entity = new WeeklyScheduleSummaryJpaEntity(
@@ -156,6 +143,72 @@ public class WeeklyScheduleSummaryProjector {
 
         log.debug("サマリー更新完了: scheduleId={}, assignedDays={}",
                 event.scheduleId().value(), event.changedDays().size());
+    }
+
+    // ========================================
+    // スケジュール公開イベント → ステータスをPUBLISHEDに更新
+    // ========================================
+
+    /**
+     * スケジュール公開イベントを処理する
+     *
+     * <p>weekly_schedule_summariesのステータスをPUBLISHEDに更新する。</p>
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void on(SchedulePublishedEvent event) {
+        log.debug("SchedulePublishedEvent受信: scheduleId={}", event.scheduleId().value());
+
+        // 既存のサマリーを取得する
+        WeeklyScheduleSummaryJpaEntity entity = entityManager.find(
+                WeeklyScheduleSummaryJpaEntity.class, event.scheduleId().value());
+
+        if (entity == null) {
+            log.warn("サマリーが見つかりません: scheduleId={}", event.scheduleId().value());
+            return;
+        }
+
+        // ステータスをPUBLISHEDに更新する
+        entity.setStatus("PUBLISHED");
+        entity.setLastEventAt(event.occurredAt());
+        entity.setEventCount(entity.getEventCount() + 1);
+        entity.setUpdatedAt(Instant.now());
+        entity.setUpdatedBy(SYSTEM_USER);
+
+        log.debug("サマリー公開完了: scheduleId={}", event.scheduleId().value());
+    }
+
+    // ========================================
+    // スケジュール非公開イベント → ステータスをDRAFTに更新
+    // ========================================
+
+    /**
+     * スケジュール非公開イベントを処理する
+     *
+     * <p>weekly_schedule_summariesのステータスをDRAFTに更新する。</p>
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void on(ScheduleUnpublishedEvent event) {
+        log.debug("ScheduleUnpublishedEvent受信: scheduleId={}", event.scheduleId().value());
+
+        // 既存のサマリーを取得する
+        WeeklyScheduleSummaryJpaEntity entity = entityManager.find(
+                WeeklyScheduleSummaryJpaEntity.class, event.scheduleId().value());
+
+        if (entity == null) {
+            log.warn("サマリーが見つかりません: scheduleId={}", event.scheduleId().value());
+            return;
+        }
+
+        // ステータスをDRAFTに更新する
+        entity.setStatus("DRAFT");
+        entity.setLastEventAt(event.occurredAt());
+        entity.setEventCount(entity.getEventCount() + 1);
+        entity.setUpdatedAt(Instant.now());
+        entity.setUpdatedBy(SYSTEM_USER);
+
+        log.debug("サマリー非公開完了: scheduleId={}", event.scheduleId().value());
     }
 
     // ========================================
