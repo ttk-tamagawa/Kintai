@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
 import {
   fetchDepartmentDashboard,
@@ -27,10 +28,17 @@ import type {
 // ========================================
 
 export function DepartmentDashboard() {
+  const { user, hasAnyRole } = useAuth();
   const toast = useToast();
+
+  // HR/ADMIN は全部署を閲覧可能、MANAGER は自部署のみ
+  const isHR = hasAnyRole(["HR", "ADMIN"]);
 
   // フィルター条件
   const [month, setMonth] = useState(getCurrentMonth());
+  const [departmentId, setDepartmentId] = useState(
+    isHR ? "" : (user?.departmentId ?? "")
+  );
 
   // KPIデータ（当月+前月）
   const [kpi, setKpi] = useState<DepartmentDashboardKpi | null>(null);
@@ -61,6 +69,7 @@ export function DepartmentDashboard() {
       setLoading(true);
       try {
         const params: DepartmentDashboardParams = {
+          departmentId: departmentId || undefined,
           month,
           page,
           size: 20,
@@ -77,7 +86,7 @@ export function DepartmentDashboard() {
         setLoading(false);
       }
     },
-    [month, sortKey, sortDir, toast]
+    [departmentId, month, sortKey, sortDir, toast]
   );
 
   // フィルター変更時にデータを再取得する
@@ -91,7 +100,7 @@ export function DepartmentDashboard() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportDepartmentDashboard(undefined, month);
+      await exportDepartmentDashboard(departmentId || undefined, month);
       toast.success("CSVファイルをダウンロードしました");
     } catch (err) {
       toast.apiError(err);
@@ -200,16 +209,38 @@ export function DepartmentDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* フィルタバー: 対象年月 + CSV出力 */}
+      {/* フィルタバー: 対象年月 + 部署フィルタ + CSV出力 */}
       <div className="flex flex-wrap items-end justify-between gap-4 rounded-lg bg-gray-50 p-4">
-        <div className="space-y-1">
-          <Label className="text-xs">対象年月</Label>
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="w-[180px]"
-          />
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs">対象年月</Label>
+            <Input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="w-[180px]"
+            />
+          </div>
+          {/* HR/ADMIN: 部署IDフィルタで絞り込み可能 */}
+          {isHR ? (
+            <div className="space-y-1">
+              <Label className="text-xs">部署ID</Label>
+              <Input
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
+                placeholder="空欄で全部署"
+                className="w-[200px]"
+              />
+            </div>
+          ) : (
+            /* MANAGER: 自部署名を表示（変更不可） */
+            <div className="space-y-1">
+              <Label className="text-xs">部署</Label>
+              <p className="flex h-9 items-center text-sm text-muted-foreground">
+                {user?.departmentName ?? "---"}
+              </p>
+            </div>
+          )}
         </div>
         <Button variant="outline" onClick={handleExport} disabled={exporting}>
           {exporting ? (

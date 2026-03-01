@@ -27,12 +27,15 @@ import type {
 // ========================================
 
 export function MonthlySummary() {
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
   const toast = useToast();
+
+  // HR/ADMIN は任意の部署を検索可能
+  const isHR = hasAnyRole(["HR", "ADMIN"]);
 
   // フィルター条件
   const [month, setMonth] = useState(getCurrentMonth());
-  const [departmentId] = useState(user?.departmentId ?? "");
+  const [departmentId, setDepartmentId] = useState(user?.departmentId ?? "");
 
   // KPIデータ
   const [kpi, setKpi] = useState<MonthlySummaryKpi | null>(null);
@@ -158,16 +161,38 @@ export function MonthlySummary() {
 
   return (
     <div className="space-y-6">
-      {/* フィルタバー: 対象年月 + CSV出力 */}
+      {/* フィルタバー: 対象年月 + 部署フィルタ + CSV出力 */}
       <div className="flex flex-wrap items-end justify-between gap-4 rounded-lg bg-gray-50 p-4">
-        <div className="space-y-1">
-          <Label className="text-xs">対象年月</Label>
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="w-[180px]"
-          />
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="space-y-1">
+            <Label className="text-xs">対象年月</Label>
+            <Input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="w-[180px]"
+            />
+          </div>
+          {/* HR/ADMIN: 部署IDを入力して任意の部署を検索可能 */}
+          {isHR ? (
+            <div className="space-y-1">
+              <Label className="text-xs">部署ID</Label>
+              <Input
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
+                placeholder="空欄で全部署"
+                className="w-[200px]"
+              />
+            </div>
+          ) : (
+            /* MANAGER: 自部署名を表示（変更不可） */
+            <div className="space-y-1">
+              <Label className="text-xs">部署</Label>
+              <p className="flex h-9 items-center text-sm text-muted-foreground">
+                {user?.departmentName ?? "---"}
+              </p>
+            </div>
+          )}
         </div>
         <Button variant="outline" onClick={handleExport} disabled={exporting}>
           {exporting ? (

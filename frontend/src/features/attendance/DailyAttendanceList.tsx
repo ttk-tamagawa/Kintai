@@ -41,8 +41,11 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export function DailyAttendanceList() {
-  const { user } = useAuth();
+  const { user, hasAnyRole } = useAuth();
   const toast = useToast();
+
+  // 管理職フラグ（MANAGER/HR/ADMIN は他従業員の検索が可能）
+  const isManager = hasAnyRole(["MANAGER", "HR", "ADMIN"]);
 
   // 検索条件
   const [employeeId, setEmployeeId] = useState(user?.employeeId ?? "");
@@ -200,6 +203,17 @@ export function DailyAttendanceList() {
       {/* 検索フォーム */}
       <div className="rounded-lg bg-gray-50 p-4">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* 従業員ID（管理職のみ表示: 他従業員の勤怠を検索可能） */}
+          {isManager && (
+            <div className="space-y-1">
+              <Label className="text-xs">従業員ID</Label>
+              <Input
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                placeholder="従業員IDを入力"
+              />
+            </div>
+          )}
           {/* 勤務期間: 開始日 */}
           <div className="space-y-1">
             <Label className="text-xs">勤務期間（開始）</Label>
