@@ -635,9 +635,9 @@ class AttendanceRecordTest {
     class CorrectClockTest {
 
         @Test
-        @DisplayName("NOT_CLOCKED状態で打刻修正が成功する")
-        void shouldCorrectClockFromNotClocked() {
-            // 未打刻状態の勤怠記録
+        @DisplayName("NOT_CLOCKED状態から打刻修正するとIllegalStateExceptionが発生する")
+        void shouldThrowWhenCorrectClockFromNotClocked() {
+            // 未打刻状態の勤怠記録（設計書: CLOCKED_OUTでのみ修正可能）
             AttendanceRecord record = createNewRecord();
             ClockCorrection correction = new ClockCorrection(
                     ClockType.CLOCK_IN,
@@ -646,36 +646,36 @@ class AttendanceRecordTest {
                     testApprovalId()
             );
 
-            // 打刻修正を実行
-            record.correctClock(correction);
-
-            // 修正エントリが追加されること
-            assertEquals(1, record.getClockEntries().size(), "修正エントリが追加されること");
-            ClockEntry correctedEntry = record.getClockEntries().get(0);
-            assertEquals(ClockType.CLOCK_IN, correctedEntry.type(), "修正対象の打刻種別であること");
-            assertEquals(clockTimeOf(9), correctedEntry.time(), "修正後の時刻であること");
-            assertEquals(ClockSource.CORRECTION, correctedEntry.source(), "打刻元がCORRECTIONであること");
+            // NOT_CLOCKED状態での修正 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.correctClock(correction),
+                    "NOT_CLOCKED状態から打刻修正すると例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("CLOCKED_OUT"),
+                    "エラーメッセージにCLOCKED_OUTが含まれること");
         }
 
         @Test
-        @DisplayName("CLOCKED_IN状態で打刻修正が成功する")
-        void shouldCorrectClockFromClockedIn() {
-            // 出勤中の勤怠記録（出勤時刻を修正するケース）
+        @DisplayName("CLOCKED_IN状態から打刻修正するとIllegalStateExceptionが発生する")
+        void shouldThrowWhenCorrectClockFromClockedIn() {
+            // 出勤中の勤怠記録（設計書: CLOCKED_OUTでのみ修正可能）
             AttendanceRecord record = createClockedInRecord();
             ClockCorrection correction = new ClockCorrection(
                     ClockType.CLOCK_IN,
-                    clockTimeOf(8), // 09:00 → 08:00 に修正
+                    clockTimeOf(8),
                     "出勤時刻の誤りを修正",
                     testApprovalId()
             );
 
-            // 打刻修正を実行
-            record.correctClock(correction);
-
-            // 元の出勤エントリ + 修正エントリの2件
-            assertEquals(2, record.getClockEntries().size(), "修正エントリが追加されること（元の打刻は保持）");
-            ClockEntry correctedEntry = record.getClockEntries().get(1);
-            assertEquals(ClockSource.CORRECTION, correctedEntry.source(), "打刻元がCORRECTIONであること");
+            // CLOCKED_IN状態での修正 → 例外発生
+            IllegalStateException exception = assertThrows(
+                    IllegalStateException.class,
+                    () -> record.correctClock(correction),
+                    "CLOCKED_IN状態から打刻修正すると例外が発生すること"
+            );
+            assertTrue(exception.getMessage().contains("CLOCKED_OUT"),
+                    "エラーメッセージにCLOCKED_OUTが含まれること");
         }
 
         @Test
@@ -715,8 +715,8 @@ class AttendanceRecordTest {
                     () -> record.correctClock(correction),
                     "FINALIZED状態から打刻修正すると例外が発生すること"
             );
-            assertTrue(exception.getMessage().contains("FINALIZED"),
-                    "エラーメッセージにFINALIZEDが含まれること");
+            assertTrue(exception.getMessage().contains("CLOCKED_OUT"),
+                    "エラーメッセージにCLOCKED_OUTが含まれること");
         }
     }
 

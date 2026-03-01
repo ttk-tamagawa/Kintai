@@ -343,18 +343,19 @@ public class AttendanceRecord {
     /**
      * 5. 打刻を修正する
      *
-     * <p>ガード条件: ステータスがFINALIZEDでないこと（INV-ATT-003）。
+     * <p>ガード条件: ステータスがCLOCKED_OUTであること。
+     * 設計書の状態遷移表に基づき、退勤済み状態でのみ打刻修正を許可する。
      * 承認済みの修正内容に基づき、source=CORRECTIONの新しい打刻エントリを追加する。
      * 元の打刻は保持されたまま残る（履歴追跡のため）。</p>
      *
      * @param correction 打刻修正内容（承認済み）
-     * @throws IllegalStateException ステータスがFINALIZEDの場合
+     * @throws IllegalStateException ステータスがCLOCKED_OUTでない場合
      */
     public void correctClock(ClockCorrection correction) {
-        // ガード条件: 確定済みでないことを確認
-        if (status == AttendanceStatus.FINALIZED) {
+        // ガード条件: 退勤済み状態であることを確認（設計書: CLOCKED_OUT → CLOCKED_OUT の自己遷移のみ許可）
+        if (status != AttendanceStatus.CLOCKED_OUT) {
             throw new IllegalStateException(
-                    "打刻を修正できません。現在のステータス: FINALIZED（本締め確定後は変更不可です）"
+                    "打刻を修正できません。現在のステータス: " + status + "（CLOCKED_OUTである必要があります）"
             );
         }
 
