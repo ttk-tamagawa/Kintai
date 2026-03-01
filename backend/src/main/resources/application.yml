@@ -23,10 +23,9 @@ spring:
 server:
   port: 8080
 
-# JWT認証設定
+# JWT認証設定（secret は各プロファイルまたは環境変数 APP_JWT_SECRET で設定すること）
 app:
   jwt:
-    secret: ${JWT_SECRET:default-dev-secret-key-that-is-at-least-256-bits-long-for-hs256}
     expiration-ms: 86400000  # 24時間
   google:
     client-id: ${GOOGLE_CLIENT_ID:not-configured}
