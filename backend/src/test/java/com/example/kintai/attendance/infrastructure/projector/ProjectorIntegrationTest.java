@@ -10,7 +10,7 @@ import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ScheduleId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -136,16 +136,11 @@ class ProjectorIntegrationTest {
         /**
          * 出勤打刻＋退勤打刻のEnd-to-Endテスト
          *
-         * <p>注意: 現在、AttendanceCommandService.clockOut()はイベントストアに
-         * "WORK_DURATION_CALCULATED"というイベント種別を記録するが、
-         * attendance_eventsテーブルのCHECK制約(chk_attendance_events_type)では
-         * "DURATION_CALCULATED"のみ許可されている。
-         * この不整合によりclockOut()がDB制約違反で失敗する。
-         * マイグレーションでCHECK制約を修正した後に@Disabledを除去すること。</p>
+         * <p>V7マイグレーションでattendance_eventsのCHECK制約をコード側のイベント型名
+         * （WORK_DURATION_CALCULATED, MANUAL_ATTENDANCE_REGISTERED, ATTENDANCE_FINALIZED）
+         * に合わせて修正済み。</p>
          */
         @Test
-        @Disabled("attendance_eventsのCHECK制約とコードのイベント種別名が不一致のため一時無効化" +
-                "（WORK_DURATION_CALCULATED vs DURATION_CALCULATED）")
         @DisplayName("出勤＋退勤打刻 → attendance_summariesに勤務時間が反映される")
         void clockInAndOut_updatesAttendanceSummaryWithWorkDuration() {
             // テスト用のユニークな従業員IDを生成する
