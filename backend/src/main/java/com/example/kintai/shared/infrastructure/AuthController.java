@@ -1,11 +1,9 @@
 package com.example.kintai.shared.infrastructure;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -19,14 +17,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 認証コントローラー — ログインとJWTトークン発行を担当する
+ * 認証コントローラー — Google OAuth によるログインとJWTトークン発行を担当する
  *
- * <p>2つのログイン方法を提供する:
- * <ul>
- *   <li>POST /api/v1/auth/dev-login — 開発用メールログイン（devプロファイルのみ有効）</li>
- *   <li>POST /api/v1/auth/google — Google OAuth IDトークンによる認証</li>
- * </ul>
- * </p>
+ * <p>POST /api/v1/auth/google — Google OAuth IDトークンによる認証</p>
+ *
+ * <p>開発用メールログイン（/dev-login）は {@link DevAuthController} に分離し、
+ * dev/testプロファイル限定で提供する。</p>
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -38,55 +34,24 @@ public class AuthController {
     private final EmployeeRoleRepository roleRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final GoogleTokenVerifier googleTokenVerifier;
-    private final boolean devLoginEnabled;
 
     public AuthController(
             EmployeeAuthRepository employeeRepository,
             EmployeeRoleRepository roleRepository,
             JwtTokenProvider jwtTokenProvider,
-            GoogleTokenVerifier googleTokenVerifier,
-            @Value("${app.auth.dev-login-enabled:false}") boolean devLoginEnabled) {
+            GoogleTokenVerifier googleTokenVerifier) {
         this.employeeRepository = employeeRepository;
         this.roleRepository = roleRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.googleTokenVerifier = googleTokenVerifier;
-        this.devLoginEnabled = devLoginEnabled;
     }
 
     // --- リクエスト/レスポンス DTO ---
 
-    /** 開発用ログインリクエスト */
-    record DevLoginRequest(@NotBlank @Email String email) {}
-
     /** Google OAuthログインリクエスト */
     record GoogleLoginRequest(@NotBlank String idToken) {}
 
-    /** ログイン成功レスポンス */
-    record LoginResponse(String token) {}
-
     // --- エンドポイント ---
-
-    /**
-     * 開発用メールログイン — email だけでJWTを発行する
-     *
-     * <p>app.auth.dev-login-enabled=true の場合のみ利用可能。
-     * 本番環境では無効にすること。</p>
-     */
-    @PostMapping("/dev-login")
-    public ResponseEntity<?> devLogin(@Valid @RequestBody DevLoginRequest request) {
-        // 開発ログインが無効な場合は 404 を返す
-        if (!devLoginEnabled) {
-            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                    HttpStatus.NOT_FOUND, "このエンドポイントは無効です");
-            problem.setTitle("Not Found");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
-        }
-
-        log.info("開発ログイン試行: email={}", request.email());
-
-        // メールアドレスで従業員を検索してJWTを発行する
-        return authenticateByEmail(request.email());
-    }
 
     /**
      * Google OAuth ログイン — Google IDトークンを検証してJWTを発行する
