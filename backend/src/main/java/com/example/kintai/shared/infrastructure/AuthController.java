@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 認証コントローラー — Google OAuth によるログインとJWTトークン発行を担当する
@@ -50,6 +49,9 @@ public class AuthController {
 
     /** Google OAuthログインリクエスト */
     record GoogleLoginRequest(@NotBlank String idToken) {}
+
+    /** 認証レスポンス（アクセストークン + リフレッシュトークン） */
+    record AuthResponse(String accessToken, String refreshToken) {}
 
     // --- エンドポイント ---
 
@@ -108,10 +110,11 @@ public class AuthController {
                 roles
         );
 
-        // JWTトークンを生成して返却する
-        String token = jwtTokenProvider.generateToken(user);
+        // アクセストークンとリフレッシュトークンを生成して返却する
+        String accessToken = jwtTokenProvider.generateToken(user);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(emp.getEmail());
         log.info("ログイン成功: employeeId={}, roles={}", emp.getEmployeeId(), roles);
 
-        return ResponseEntity.ok(Map.of("token", token));
+        return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));
     }
 }

@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 開発用認証コントローラー — 開発・テスト環境限定のメールログイン
@@ -48,6 +47,9 @@ public class DevAuthController {
     /** 開発用ログインリクエスト */
     record DevLoginRequest(@NotBlank @Email String email) {}
 
+    /** 認証レスポンス（アクセストークン + リフレッシュトークン） */
+    record AuthResponse(String accessToken, String refreshToken) {}
+
     /**
      * 開発用メールログイン — email だけでJWTを発行する
      *
@@ -76,7 +78,7 @@ public class DevAuthController {
                 .map(EmployeeRoleJpaEntity::getRole)
                 .toList();
 
-        // 認証済みユーザー情報を作成してJWTトークンを生成する
+        // 認証済みユーザー情報を作成してトークンペアを生成する
         AuthenticatedUser user = new AuthenticatedUser(
                 emp.getEmail(),
                 emp.getEmployeeId(),
@@ -86,9 +88,11 @@ public class DevAuthController {
                 roles
         );
 
-        String token = jwtTokenProvider.generateToken(user);
+        // アクセストークンとリフレッシュトークンを生成して返却する
+        String accessToken = jwtTokenProvider.generateToken(user);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(emp.getEmail());
         log.info("開発ログイン成功: employeeId={}, roles={}", emp.getEmployeeId(), roles);
 
-        return ResponseEntity.ok(Map.of("token", token));
+        return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));
     }
 }

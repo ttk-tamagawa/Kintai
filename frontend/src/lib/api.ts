@@ -1,4 +1,14 @@
-import axios, { AxiosError, type AxiosResponse } from "axios";
+import axios, {
+  AxiosError,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from "axios";
+import {
+  getRefreshToken,
+  setToken,
+  setRefreshToken,
+  clearAllTokens,
+} from "./auth";
 
 // ========================================
 // APIクライアント（Axiosラッパー）
@@ -35,22 +45,106 @@ api.interceptors.request.use(
 );
 
 // ========================================
-// レスポンスインターセプター
+// レスポンスインターセプター（リフレッシュトークン対応）
 // ========================================
+
+// リフレッシュ中かどうかを管理するフラグ
+let isRefreshing = false;
+// リフレッシュ完了待ちのリクエストキュー
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+/** リフレッシュ完了後に待機中のリクエストを再実行する */
+function onRefreshed(newToken: string) {
+  refreshSubscribers.forEach((callback) => callback(newToken));
+  refreshSubscribers = [];
+}
+
+/** リフレッシュ完了を待つPromiseを返す */
+function addRefreshSubscriber(
+  config: InternalAxiosRequestConfig
+): Promise<AxiosResponse> {
+  return new Promise((resolve) => {
+    refreshSubscribers.push((newToken: string) => {
+      config.headers.Authorization = `Bearer ${newToken}`;
+      resolve(api(config));
+    });
+  });
+}
 
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    // 401 Unauthorized: トークン無効 → ログインページへリダイレクト
-    if (error.response?.status === 401) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
-        // 現在のパスがログインページでなければリダイレクトする
-        if (window.location.pathname !== "/login") {
+  async (error: AxiosError) => {
+    const originalRequest = error.config;
+
+    // 401 Unauthorized: トークンが無効または期限切れ
+    if (error.response?.status === 401 && originalRequest) {
+      // リフレッシュエンドポイント自体が401の場合は即ログアウト（無限ループ防止）
+      if (originalRequest.url?.includes("/auth/refresh")) {
+        clearAllTokens();
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login"
+        ) {
           window.location.href = "/login";
         }
+        return Promise.reject(error);
+      }
+
+      // リフレッシュトークンが存在しない場合は即ログアウト
+      const currentRefreshToken = getRefreshToken();
+      if (!currentRefreshToken) {
+        clearAllTokens();
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login"
+        ) {
+          window.location.href = "/login";
+        }
+        return Promise.reject(error);
+      }
+
+      // 既にリフレッシュ中の場合は、完了待ちキューに追加する
+      if (isRefreshing) {
+        return addRefreshSubscriber(originalRequest);
+      }
+
+      // リフレッシュ処理を開始する
+      isRefreshing = true;
+
+      try {
+        // リフレッシュトークンで新しいトークンペアを取得する
+        const response = await api.post<{
+          accessToken: string;
+          refreshToken: string;
+        }>("/auth/refresh", { refreshToken: currentRefreshToken });
+
+        const { accessToken, refreshToken } = response.data;
+
+        // 新しいトークンを保存する
+        setToken(accessToken);
+        setRefreshToken(refreshToken);
+
+        // 待機中のリクエストを新しいトークンで再実行する
+        onRefreshed(accessToken);
+
+        // 元のリクエストを新しいトークンでリトライする
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      } catch {
+        // リフレッシュ失敗: トークンをクリアしてログインページへ
+        clearAllTokens();
+        if (
+          typeof window !== "undefined" &&
+          window.location.pathname !== "/login"
+        ) {
+          window.location.href = "/login";
+        }
+        return Promise.reject(error);
+      } finally {
+        isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   }
 );

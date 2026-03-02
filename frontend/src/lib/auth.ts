@@ -3,6 +3,7 @@
 // ========================================
 
 const TOKEN_KEY = "auth_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
 
 /** トークンを保存する */
 export function setToken(token: string): void {
@@ -29,6 +30,34 @@ export function removeToken(): void {
 /** トークンが存在するか確認する */
 export function hasToken(): boolean {
   return getToken() !== null;
+}
+
+/** リフレッシュトークンを保存する */
+export function setRefreshToken(token: string): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(REFRESH_TOKEN_KEY, token);
+  }
+}
+
+/** リフレッシュトークンを取得する */
+export function getRefreshToken(): string | null {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem(REFRESH_TOKEN_KEY);
+  }
+  return null;
+}
+
+/** リフレッシュトークンを削除する */
+export function removeRefreshToken(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  }
+}
+
+/** アクセストークンとリフレッシュトークンを両方削除する */
+export function clearAllTokens(): void {
+  removeToken();
+  removeRefreshToken();
 }
 
 /** JWTペイロードをデコードする（Base64デコード） */

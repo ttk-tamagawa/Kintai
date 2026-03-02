@@ -16,6 +16,7 @@ import org.springframework.validation.annotation.Validated;
 public record JwtProperties(
         @NotBlank(message = "JWT シークレットキーが設定されていません。環境変数 JWT_SECRET を設定してください")
         String secret,
-        long expirationMs
+        long expirationMs,
+        long refreshExpirationMs
 ) {
 }

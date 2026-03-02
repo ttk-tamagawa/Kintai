@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { devLogin } from "@/lib/authApi";
+import { setRefreshToken } from "@/lib/auth";
 
 // ========================================
 // ログインページ
@@ -30,8 +31,10 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = await devLogin(email);
-      login(token);
+      // アクセストークンとリフレッシュトークンを取得して保存する
+      const { accessToken, refreshToken } = await devLogin(email);
+      setRefreshToken(refreshToken);
+      login(accessToken);
       router.push("/attendance");
     } catch {
       setError("ログインに失敗しました。バックエンドが起動しているか確認してください。");

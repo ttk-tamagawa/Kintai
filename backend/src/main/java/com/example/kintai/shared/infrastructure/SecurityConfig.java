@@ -69,8 +69,8 @@ public class SecurityConfig {
                 .accessDeniedHandler(jwtAccessDeniedHandler))
             // URL別の認可ルールを設定する
             .authorizeHttpRequests(auth -> {
-                // Google認証エンドポイントは常に全許可
-                auth.requestMatchers("/api/v1/auth/google").permitAll();
+                // Google認証・リフレッシュエンドポイントは常に全許可
+                auth.requestMatchers("/api/v1/auth/google", "/api/v1/auth/refresh").permitAll();
                 // dev-loginはdev/testプロファイル時のみ許可（本番ではコントローラー自体が不在 + パスも認証必須）
                 if (environment.matchesProfiles("dev | test")) {
                     auth.requestMatchers("/api/v1/auth/dev-login").permitAll();

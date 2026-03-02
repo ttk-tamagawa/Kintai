@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AuthUser, Role } from "@/types";
-import { getToken, removeToken, setToken, decodeTokenPayload } from "@/lib/auth";
+import { getToken, clearAllTokens, setToken, decodeTokenPayload } from "@/lib/auth";
 
 // ========================================
 // 認証コンテキスト
@@ -67,9 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
   }, []);
 
-  // ログアウト: トークンを削除してユーザー情報をクリアする
+  // ログアウト: アクセストークン・リフレッシュトークンを両方削除してユーザー情報をクリアする
   const logout = useCallback(() => {
-    removeToken();
+    clearAllTokens();
     setUser(null);
   }, []);
 

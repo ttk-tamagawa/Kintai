@@ -19,4 +19,5 @@ app:
       - http://localhost:3000
   jwt:
     secret: test-secret-key-that-is-at-least-256-bits-long-for-hs256-signing
-    expiration-ms: 3600000  # 1時間
+    expiration-ms: 3600000           # アクセストークン: 1時間
+    refresh-expiration-ms: 3600000   # リフレッシュトークン: 1時間
