@@ -41,6 +41,7 @@ public record DailyAttendancePageResponse(
      * @param lateNightMinutes     深夜残業（分）
      * @param holidayMinutes       休日勤務（分）
      * @param totalOvertimeMinutes 合計残業時間（分）
+     * @param updatedAt            更新日時（UTC Instant）
      */
     public record DailyAttendanceRow(
             UUID attendanceId,
@@ -56,6 +57,7 @@ public record DailyAttendancePageResponse(
             int regularOvertimeMinutes,
             int lateNightMinutes,
             int holidayMinutes,
-            int totalOvertimeMinutes
+            int totalOvertimeMinutes,
+            Instant updatedAt
     ) {}
 }

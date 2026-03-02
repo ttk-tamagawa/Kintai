@@ -19,6 +19,7 @@ import java.util.UUID;
  * @param breakMinutes       合計休憩時間（分）
  * @param netWorkMinutes     正味勤務時間（分、未計算の場合はnull）
  * @param totalOvertimeMinutes 合計残業時間（分、未計算の場合はnull）
+ * @param updatedAt          更新日時（UTC Instant）
  */
 public record TodayAttendanceResponse(
         UUID attendanceId,
@@ -29,5 +30,6 @@ public record TodayAttendanceResponse(
         Instant clockOut,
         int breakMinutes,
         Integer netWorkMinutes,
-        Integer totalOvertimeMinutes
+        Integer totalOvertimeMinutes,
+        Instant updatedAt
 ) {}

@@ -238,7 +238,9 @@ public class ShiftPatternController {
                 summary.endTime(),
                 summary.breakMinutes(),
                 summary.isOvernight(),
-                summary.isActive()
+                summary.isActive(),
+                summary.createdAt(),
+                summary.updatedAt()
         );
     }
 }

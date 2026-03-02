@@ -41,7 +41,8 @@ public interface AttendanceSummaryQueryRepository {
             int regularOvertimeMinutes,
             int lateNightMinutes,
             int holidayMinutes,
-            int totalOvertimeMinutes
+            int totalOvertimeMinutes,
+            Instant updatedAt
     ) {}
 
     /**

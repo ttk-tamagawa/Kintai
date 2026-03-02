@@ -345,7 +345,8 @@ public class AttendanceQueryController {
                 result.clockOut(),
                 result.breakMinutes(),
                 result.netWorkMinutes(),
-                result.totalOvertimeMinutes()
+                result.totalOvertimeMinutes(),
+                result.updatedAt()
         );
     }
 
@@ -367,7 +368,8 @@ public class AttendanceQueryController {
                         s.regularOvertimeMinutes(),
                         s.lateNightMinutes(),
                         s.holidayMinutes(),
-                        s.totalOvertimeMinutes()
+                        s.totalOvertimeMinutes(),
+                        s.updatedAt()
                 ))
                 .toList();
 

@@ -1,5 +1,6 @@
 package com.example.kintai.attendance.presentation.dto;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -22,6 +23,8 @@ import java.util.UUID;
  * @param breakMinutes 休憩時間（分）
  * @param isOvernight  夜勤フラグ
  * @param isActive     有効フラグ
+ * @param createdAt    作成日時（UTC Instant）
+ * @param updatedAt    更新日時（UTC Instant）
  */
 public record PatternResponse(
         UUID patternId,
@@ -30,5 +33,7 @@ public record PatternResponse(
         String endTime,
         int breakMinutes,
         boolean isOvernight,
-        boolean isActive
+        boolean isActive,
+        Instant createdAt,
+        Instant updatedAt
 ) {}

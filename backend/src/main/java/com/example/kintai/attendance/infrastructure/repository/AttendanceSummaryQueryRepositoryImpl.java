@@ -275,7 +275,8 @@ public class AttendanceSummaryQueryRepositoryImpl implements AttendanceSummaryQu
                 e.getRegularOvertimeMinutes(),
                 e.getLateNightMinutes(),
                 e.getHolidayMinutes(),
-                e.getTotalOvertimeMinutes()
+                e.getTotalOvertimeMinutes(),
+                e.getUpdatedAt()
         );
     }
 

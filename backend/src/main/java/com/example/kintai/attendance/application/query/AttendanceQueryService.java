@@ -72,7 +72,8 @@ public class AttendanceQueryService {
             Instant clockOut,
             int breakMinutes,
             Integer netWorkMinutes,
-            Integer totalOvertimeMinutes
+            Integer totalOvertimeMinutes,
+            Instant updatedAt
     ) {}
 
     /**
@@ -179,7 +180,8 @@ public class AttendanceQueryService {
                 s.breakMinutes(),
                 // 未退勤の場合はnull（計算未実施）
                 s.netWorkMinutes() > 0 ? s.netWorkMinutes() : null,
-                s.totalOvertimeMinutes() > 0 ? s.totalOvertimeMinutes() : null
+                s.totalOvertimeMinutes() > 0 ? s.totalOvertimeMinutes() : null,
+                s.updatedAt()
         ));
     }
 

@@ -178,6 +178,10 @@ public class WeeklyScheduleSummaryJpaEntity {
     public int getAssignedDays() { return assignedDays; }
     public Instant getLastEventAt() { return lastEventAt; }
     public int getEventCount() { return eventCount; }
+    /** 作成日時を取得する */
+    public Instant getCreatedAt() { return createdAt; }
+    /** 更新日時を取得する */
+    public Instant getUpdatedAt() { return updatedAt; }
 
     // プロジェクター用セッター（Read Modelの更新に使用）
 

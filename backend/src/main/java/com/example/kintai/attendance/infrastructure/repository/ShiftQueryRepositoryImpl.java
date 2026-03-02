@@ -121,7 +121,9 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
                 e.getEndTime().toString(),
                 e.getBreakMinutes(),
                 e.isOvernight(),
-                e.isActive()
+                e.isActive(),
+                e.getCreatedAt(),
+                e.getUpdatedAt()
         );
     }
 
@@ -139,7 +141,9 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
                 e.getFridayPatternId(), e.getFridayPatternName(),
                 e.getSaturdayPatternId(), e.getSaturdayPatternName(),
                 e.getSundayPatternId(), e.getSundayPatternName(),
-                e.getAssignedDays()
+                e.getAssignedDays(),
+                e.getCreatedAt(),
+                e.getUpdatedAt()
         );
     }
 }

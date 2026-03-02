@@ -2,6 +2,7 @@ package com.example.kintai.attendance.domain.repository;
 
 import com.example.kintai.shared.domain.model.EmployeeId;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +31,9 @@ public interface ShiftQueryRepository {
             String endTime,
             int breakMinutes,
             boolean isOvernight,
-            boolean isActive
+            boolean isActive,
+            Instant createdAt,
+            Instant updatedAt
     ) {}
 
     /**
@@ -51,7 +54,9 @@ public interface ShiftQueryRepository {
             UUID fridayPatternId, String fridayPatternName,
             UUID saturdayPatternId, String saturdayPatternName,
             UUID sundayPatternId, String sundayPatternName,
-            int assignedDays
+            int assignedDays,
+            Instant createdAt,
+            Instant updatedAt
     ) {}
 
     // ========================

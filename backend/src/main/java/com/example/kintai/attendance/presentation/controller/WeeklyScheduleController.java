@@ -344,7 +344,9 @@ public class WeeklyScheduleController {
                 summary.weekStartDate(),
                 summary.status(),
                 assignments,
-                summary.assignedDays()
+                summary.assignedDays(),
+                summary.createdAt(),
+                summary.updatedAt()
         );
     }
 

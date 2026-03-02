@@ -1,5 +1,6 @@
 package com.example.kintai.attendance.presentation.dto;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +27,8 @@ import java.util.UUID;
  * @param status        ステータス（DRAFT / PUBLISHED）
  * @param assignments   曜日ごとの割当（キー: MONDAY〜SUNDAY、値: DayAssignment）
  * @param assignedDays  割当日数
+ * @param createdAt     作成日時（UTC Instant）
+ * @param updatedAt     更新日時（UTC Instant）
  */
 public record ScheduleResponse(
         UUID scheduleId,
@@ -33,7 +36,9 @@ public record ScheduleResponse(
         LocalDate weekStartDate,
         String status,
         Map<String, DayAssignment> assignments,
-        int assignedDays
+        int assignedDays,
+        Instant createdAt,
+        Instant updatedAt
 ) {
 
     /**
