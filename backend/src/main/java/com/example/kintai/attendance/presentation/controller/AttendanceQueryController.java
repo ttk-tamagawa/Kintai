@@ -55,7 +55,7 @@ import java.util.UUID;
  * <p>全エンドポイントはRead Model（CQRSの読み取り側）を参照する。
  * Write Model（集約）へのアクセスは行わない。</p>
  *
- * <p>認可: today→EMPLOYEE, daily→EMPLOYEE/MANAGER/HR, monthly-summary→MANAGER/HR, department-dashboard→HR/ADMIN</p>
+ * <p>認可: today→EMPLOYEE, daily→EMPLOYEE/MANAGER/HR, monthly-summary→MANAGER/HR, department-dashboard→MANAGER/HR</p>
  */
 @RestController
 @RequestMapping("/api/v1/attendances")
@@ -260,7 +260,7 @@ public class AttendanceQueryController {
      * @return KPI + 前月KPI + 部門別テーブルのダッシュボード
      */
     @GetMapping("/department-dashboard")
-    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
     public ResponseEntity<DepartmentDashboardResponse> getDepartmentDashboard(
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) Integer year,
@@ -304,7 +304,7 @@ public class AttendanceQueryController {
      * @return CSVファイル（UTF-8 BOM付き）
      */
     @GetMapping("/department-dashboard/export")
-    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
     public ResponseEntity<byte[]> exportDepartmentDashboard(
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) Integer year,
