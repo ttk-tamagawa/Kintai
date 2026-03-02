@@ -3,6 +3,7 @@ package com.example.kintai.attendance.domain.model;
 import com.example.kintai.shared.domain.model.ApprovalId;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -99,7 +100,7 @@ class AttendanceRecordTest {
      */
     private static AttendanceRecord createFinalizedRecord() {
         AttendanceRecord record = createClockedOutRecord();
-        record.finalizeRecord("monthly-closing-001");
+        record.finalizeRecord(MonthlyClosingId.generate());
         return record;
     }
 
@@ -732,7 +733,7 @@ class AttendanceRecordTest {
             ClockTime startTime = clockTimeOf(9);  // 09:00
             ClockTime endTime = clockTimeOf(18);    // 18:00
             ManualAttendance manual = new ManualAttendance(
-                    startTime, endTime, "通常勤務", "打刻漏れのため", testApprovalId()
+                    startTime, endTime, AttendanceType.NORMAL, "打刻漏れのため", testApprovalId()
             );
 
             // 勤務実績の手動登録を実行
@@ -764,7 +765,7 @@ class AttendanceRecordTest {
             // 未打刻状態の勤怠記録
             AttendanceRecord record = createNewRecord();
             ManualAttendance manual = new ManualAttendance(
-                    clockTimeOf(18), clockTimeOf(9), "通常勤務", "理由", testApprovalId()
+                    clockTimeOf(18), clockTimeOf(9), AttendanceType.NORMAL, "理由", testApprovalId()
             );
 
             // 終了時刻（09:00）が開始時刻（18:00）より前 → 例外発生
@@ -783,7 +784,7 @@ class AttendanceRecordTest {
             // 未打刻状態の勤怠記録
             AttendanceRecord record = createNewRecord();
             ManualAttendance manual = new ManualAttendance(
-                    clockTimeOf(9), clockTimeOf(9), "通常勤務", "理由", testApprovalId()
+                    clockTimeOf(9), clockTimeOf(9), AttendanceType.NORMAL, "理由", testApprovalId()
             );
 
             // 終了時刻と開始時刻が同じ → 例外発生
@@ -802,7 +803,7 @@ class AttendanceRecordTest {
             // 出勤中の勤怠記録
             AttendanceRecord record = createClockedInRecord();
             ManualAttendance manual = new ManualAttendance(
-                    clockTimeOf(9), clockTimeOf(18), "通常勤務", "理由", testApprovalId()
+                    clockTimeOf(9), clockTimeOf(18), AttendanceType.NORMAL, "理由", testApprovalId()
             );
 
             // 出勤済みの状態で手動登録 → 例外発生
@@ -819,7 +820,7 @@ class AttendanceRecordTest {
             // 退勤済みの勤怠記録
             AttendanceRecord record = createClockedOutRecord();
             ManualAttendance manual = new ManualAttendance(
-                    clockTimeOf(9), clockTimeOf(18), "通常勤務", "理由", testApprovalId()
+                    clockTimeOf(9), clockTimeOf(18), AttendanceType.NORMAL, "理由", testApprovalId()
             );
 
             // 退勤済みの状態で手動登録 → 例外発生
@@ -836,7 +837,7 @@ class AttendanceRecordTest {
             // 確定済み状態の勤怠記録
             AttendanceRecord record = createFinalizedRecord();
             ManualAttendance manual = new ManualAttendance(
-                    clockTimeOf(9), clockTimeOf(18), "通常勤務", "理由", testApprovalId()
+                    clockTimeOf(9), clockTimeOf(18), AttendanceType.NORMAL, "理由", testApprovalId()
             );
 
             // 確定後に手動登録 → 例外発生
@@ -857,7 +858,7 @@ class AttendanceRecordTest {
         void shouldFinalizeFromClockedOut() {
             // 退勤済み状態の勤怠記録
             AttendanceRecord record = createClockedOutRecord();
-            String monthlyClosingId = "monthly-closing-202602";
+            MonthlyClosingId monthlyClosingId = MonthlyClosingId.generate();
 
             // 本締め確定を実行
             record.finalizeRecord(monthlyClosingId);
@@ -876,7 +877,7 @@ class AttendanceRecordTest {
             // 出勤すらしていないのに確定 → 例外発生
             assertThrows(
                     IllegalStateException.class,
-                    () -> record.finalizeRecord("monthly-closing-001"),
+                    () -> record.finalizeRecord(MonthlyClosingId.generate()),
                     "NOT_CLOCKED状態から本締め確定すると例外が発生すること"
             );
         }
@@ -890,7 +891,7 @@ class AttendanceRecordTest {
             // 退勤していないのに確定 → 例外発生
             IllegalStateException exception = assertThrows(
                     IllegalStateException.class,
-                    () -> record.finalizeRecord("monthly-closing-001"),
+                    () -> record.finalizeRecord(MonthlyClosingId.generate()),
                     "CLOCKED_IN状態から本締め確定すると例外が発生すること（退勤が先に必要）"
             );
             assertTrue(exception.getMessage().contains("CLOCKED_OUT"),
@@ -906,7 +907,7 @@ class AttendanceRecordTest {
             // 二重確定 → 例外発生
             assertThrows(
                     IllegalStateException.class,
-                    () -> record.finalizeRecord("monthly-closing-002"),
+                    () -> record.finalizeRecord(MonthlyClosingId.generate()),
                     "FINALIZED状態から再度本締め確定すると例外が発生すること"
             );
         }
@@ -981,7 +982,7 @@ class AttendanceRecordTest {
             // 状態遷移: NOT_CLOCKED → CLOCKED_IN → CLOCKED_OUT → FINALIZED
             record.clockIn(clockTimeOf(9), ClockSource.WEB);
             record.clockOut(clockTimeOf(18), ClockSource.WEB);
-            record.finalizeRecord("monthly-closing-202602");
+            record.finalizeRecord(MonthlyClosingId.generate());
 
             // 最終状態がFINALIZEDであること
             assertEquals(AttendanceStatus.FINALIZED, record.getStatus(),
@@ -1028,7 +1029,7 @@ class AttendanceRecordTest {
             // 新規勤怠記録を作成
             AttendanceRecord record = createNewRecord();
             ManualAttendance manual = new ManualAttendance(
-                    clockTimeOf(9), clockTimeOf(18), "通常勤務", "打刻漏れ", testApprovalId()
+                    clockTimeOf(9), clockTimeOf(18), AttendanceType.NORMAL, "打刻漏れ", testApprovalId()
             );
 
             // 手動登録 → CLOCKED_OUT
@@ -1037,7 +1038,7 @@ class AttendanceRecordTest {
                     "手動登録後にCLOCKED_OUTであること");
 
             // 本締め確定 → FINALIZED
-            record.finalizeRecord("monthly-closing-202602");
+            record.finalizeRecord(MonthlyClosingId.generate());
             assertEquals(AttendanceStatus.FINALIZED, record.getStatus(),
                     "本締め確定後にFINALIZEDであること");
         }
@@ -1107,7 +1108,7 @@ class AttendanceRecordTest {
         @DisplayName("FINALIZED後にregisterManualAttendanceが拒否される")
         void shouldRejectRegisterManualAttendanceAfterFinalized() {
             ManualAttendance manual = new ManualAttendance(
-                    clockTimeOf(9), clockTimeOf(18), "通常勤務", "理由", testApprovalId()
+                    clockTimeOf(9), clockTimeOf(18), AttendanceType.NORMAL, "理由", testApprovalId()
             );
             assertThrows(IllegalStateException.class,
                     () -> finalizedRecord.registerManualAttendance(manual),
@@ -1118,7 +1119,7 @@ class AttendanceRecordTest {
         @DisplayName("FINALIZED後にfinalizeRecordが拒否される")
         void shouldRejectFinalizeAfterFinalized() {
             assertThrows(IllegalStateException.class,
-                    () -> finalizedRecord.finalizeRecord("monthly-closing-002"),
+                    () -> finalizedRecord.finalizeRecord(MonthlyClosingId.generate()),
                     "FINALIZED後のfinalizeRecordは拒否されること");
         }
     }

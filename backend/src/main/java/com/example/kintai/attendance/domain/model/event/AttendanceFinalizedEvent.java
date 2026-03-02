@@ -3,6 +3,7 @@ package com.example.kintai.attendance.domain.model.event;
 import com.example.kintai.attendance.domain.model.WorkDate;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.domain.model.MonthlyClosingId;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -28,7 +29,7 @@ public record AttendanceFinalizedEvent(
         AttendanceRecordId attendanceRecordId,
         EmployeeId employeeId,
         WorkDate workDate,
-        String monthlyClosingId,
+        MonthlyClosingId monthlyClosingId,
         Instant occurredAt
 ) {
 
@@ -59,7 +60,7 @@ public record AttendanceFinalizedEvent(
             AttendanceRecordId attendanceRecordId,
             EmployeeId employeeId,
             WorkDate workDate,
-            String monthlyClosingId
+            MonthlyClosingId monthlyClosingId
     ) {
         return new AttendanceFinalizedEvent(
                 attendanceRecordId,

@@ -1,6 +1,7 @@
 package com.example.kintai.attendance.domain.model;
 
 import com.example.kintai.shared.domain.model.ApprovalId;
+
 import java.util.Objects;
 
 /**
@@ -12,14 +13,14 @@ import java.util.Objects;
  *
  * @param startTime  勤務開始時刻（null不可）
  * @param endTime    勤務終了時刻（null不可）
- * @param type       勤務種別（null不可）— 例: "通常勤務", "出張" 等
+ * @param type       勤務種別（null不可）— NORMAL, BUSINESS_TRIP, REMOTE, PAID_LEAVE, ABSENCE
  * @param reason     登録理由（null不可）— 例: "打刻漏れのため"
  * @param approvalId 承認ID（null不可）
  */
 public record ManualAttendance(
         ClockTime startTime,
         ClockTime endTime,
-        String type,
+        AttendanceType type,
         String reason,
         ApprovalId approvalId
 ) {

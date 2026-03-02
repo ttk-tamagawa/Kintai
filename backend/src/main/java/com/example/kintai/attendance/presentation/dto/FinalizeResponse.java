@@ -14,7 +14,7 @@ import java.util.UUID;
  * @param employeeId      従業員ID
  * @param workDate        勤務日（YYYY-MM-DD）
  * @param status          勤怠ステータス（FINALIZED）
- * @param monthlyClosingId 月次締めID
+ * @param monthlyClosingId 月次締めID（UUID）
  * @param updatedAt       更新日時（UTC Instant）
  */
 public record FinalizeResponse(
@@ -22,6 +22,6 @@ public record FinalizeResponse(
         UUID employeeId,
         LocalDate workDate,
         String status,
-        String monthlyClosingId,
+        UUID monthlyClosingId,
         Instant updatedAt
 ) {}

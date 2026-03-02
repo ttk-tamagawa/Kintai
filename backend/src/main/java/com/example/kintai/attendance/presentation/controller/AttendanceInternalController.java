@@ -3,6 +3,7 @@ package com.example.kintai.attendance.presentation.controller;
 import com.example.kintai.attendance.application.command.AttendanceCommandService;
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
 import com.example.kintai.attendance.domain.model.AttendanceStatus;
+import com.example.kintai.attendance.domain.model.AttendanceType;
 import com.example.kintai.attendance.domain.model.ClockCorrection;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.attendance.domain.model.ClockType;
@@ -18,6 +19,7 @@ import com.example.kintai.attendance.presentation.dto.RegisterManualAttendanceRe
 import com.example.kintai.shared.domain.model.ApprovalId;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -151,9 +153,12 @@ public class AttendanceInternalController {
         ShiftPatternId shiftPatternId = request.shiftPatternId() != null
                 ? ShiftPatternId.of(request.shiftPatternId()) : null;
 
+        // リクエストの勤務種別文字列をAttendanceType enumに変換する
+        AttendanceType attendanceType = parseAttendanceType(request.type());
+
         // ManualAttendance値オブジェクトを生成する
         ManualAttendance manual = new ManualAttendance(
-                startTime, endTime, request.type(), request.reason(), approvalId);
+                startTime, endTime, attendanceType, request.reason(), approvalId);
 
         // アプリケーションサービスを呼び出す（手動登録 → 勤務時間計算 → 保存）
         AttendanceRecordId attendanceId = commandService.registerManualAttendance(
@@ -202,9 +207,10 @@ public class AttendanceInternalController {
 
         // リクエストをドメインオブジェクトに変換する
         AttendanceRecordId attendanceId = AttendanceRecordId.of(request.attendanceId());
+        MonthlyClosingId monthlyClosingId = MonthlyClosingId.of(request.monthlyClosingId());
 
         // アプリケーションサービスを呼び出す（CLOCKED_OUT→FINALIZED → 保存）
-        commandService.finalizeRecord(attendanceId, request.monthlyClosingId());
+        commandService.finalizeRecord(attendanceId, monthlyClosingId);
 
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
@@ -242,6 +248,25 @@ public class AttendanceInternalController {
             throw new IllegalArgumentException(
                     "無効な打刻種別です: " + type
                             + "（CLOCK_IN, CLOCK_OUT, BREAK_START, BREAK_END のいずれかを指定してください）");
+        }
+    }
+
+    /**
+     * 勤務種別文字列をAttendanceType enumに変換する
+     *
+     * <p>無効な値が指定された場合は分かりやすいエラーメッセージを返す。</p>
+     *
+     * @param type 勤務種別文字列（"NORMAL" / "BUSINESS_TRIP" / "REMOTE" / "PAID_LEAVE" / "ABSENCE"）
+     * @return AttendanceType enum値
+     * @throws IllegalArgumentException 無効な勤務種別の場合
+     */
+    private AttendanceType parseAttendanceType(String type) {
+        try {
+            return AttendanceType.valueOf(type);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "無効な勤務種別です: " + type
+                            + "（NORMAL, BUSINESS_TRIP, REMOTE, PAID_LEAVE, ABSENCE のいずれかを指定してください）");
         }
     }
 

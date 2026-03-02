@@ -11,9 +11,9 @@ import java.util.UUID;
  * 確定後は一切の変更が不可となる。</p>
  *
  * @param attendanceId   確定対象の勤怠記録ID（必須）
- * @param monthlyClosingId 月次締めID（必須）— どの締め処理に基づく確定かを紐づける
+ * @param monthlyClosingId 月次締めID（必須、UUID）— どの締め処理に基づく確定かを紐づける
  */
 public record FinalizeRequest(
         @NotNull UUID attendanceId,
-        @NotNull String monthlyClosingId
+        @NotNull UUID monthlyClosingId
 ) {}

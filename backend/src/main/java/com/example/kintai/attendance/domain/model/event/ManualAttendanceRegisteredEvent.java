@@ -1,5 +1,6 @@
 package com.example.kintai.attendance.domain.model.event;
 
+import com.example.kintai.attendance.domain.model.AttendanceType;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.attendance.domain.model.WorkDate;
 import com.example.kintai.shared.domain.model.ApprovalId;
@@ -25,7 +26,7 @@ import java.util.Objects;
  * @param workDate           勤務日
  * @param startTime          勤務開始時刻
  * @param endTime            勤務終了時刻
- * @param type               勤務種別（例: "通常勤務", "出張"）
+ * @param type               勤務種別（NORMAL, BUSINESS_TRIP, REMOTE, PAID_LEAVE, ABSENCE）
  * @param approvalId         承認ID（どの承認に基づく登録か）
  * @param occurredAt         イベント発生日時
  */
@@ -35,7 +36,7 @@ public record ManualAttendanceRegisteredEvent(
         WorkDate workDate,
         ClockTime startTime,
         ClockTime endTime,
-        String type,
+        AttendanceType type,
         ApprovalId approvalId,
         Instant occurredAt
 ) {
@@ -75,7 +76,7 @@ public record ManualAttendanceRegisteredEvent(
             WorkDate workDate,
             ClockTime startTime,
             ClockTime endTime,
-            String type,
+            AttendanceType type,
             ApprovalId approvalId
     ) {
         return new ManualAttendanceRegisteredEvent(

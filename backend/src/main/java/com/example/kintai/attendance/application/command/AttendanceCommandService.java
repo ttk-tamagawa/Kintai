@@ -9,6 +9,7 @@ import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.service.WorkDurationCalculator;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -445,7 +446,7 @@ public class AttendanceCommandService {
      * @param id               勤怠記録ID
      * @param monthlyClosingId 月次締めID（どの締め処理に基づく確定か）
      */
-    public void finalizeRecord(AttendanceRecordId id, String monthlyClosingId) {
+    public void finalizeRecord(AttendanceRecordId id, MonthlyClosingId monthlyClosingId) {
         // 勤怠記録を取得する
         AttendanceRecord record = findRecordOrThrow(id);
         log.debug("本締め確定: attendanceId={}, monthlyClosingId={}", id.value(), monthlyClosingId);

@@ -2,6 +2,7 @@ package com.example.kintai.attendance.domain.model;
 
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 
 import java.time.Instant;
@@ -423,7 +424,7 @@ public class AttendanceRecord {
      * @param monthlyClosingId 月次締めID
      * @throws IllegalStateException ステータスがCLOCKED_OUTでない場合
      */
-    public void finalizeRecord(String monthlyClosingId) {
+    public void finalizeRecord(MonthlyClosingId monthlyClosingId) {
         // ガード条件: 退勤済みであることを確認
         if (status != AttendanceStatus.CLOCKED_OUT) {
             throw new IllegalStateException(

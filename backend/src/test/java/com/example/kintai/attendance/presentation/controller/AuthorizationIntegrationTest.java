@@ -85,7 +85,7 @@ class AuthorizationIntegrationTest {
             "workDate", "2026-02-28",
             "startTime", "2026-02-28T09:00:00+09:00",
             "endTime", "2026-02-28T18:00:00+09:00",
-            "type", "通常勤務",
+            "type", "NORMAL",
             "reason", "テスト手動登録",
             "approvalId", "00000000-0000-0000-0000-000000000001"
     );
@@ -93,7 +93,7 @@ class AuthorizationIntegrationTest {
     /** 確定リクエストのダミーボディ（FinalizeRequest に合わせる） */
     private static final Map<String, Object> FINALIZE_REQUEST = Map.of(
             "attendanceId", "00000000-0000-0000-0000-000000000001",
-            "monthlyClosingId", "monthly-2026-02"
+            "monthlyClosingId", "00000000-0000-0000-0000-000000000002"
     );
 
     /** シフトパターン作成リクエストのダミーボディ */
