@@ -23,11 +23,12 @@ import {
   type ScheduleListParams,
 } from "./api";
 import { ShiftAssignModal } from "./ShiftAssignModal";
-import type { ScheduleItem, DayOfWeek, PageInfo } from "@/types";
+import type { ScheduleItem, DayOfWeek } from "@/types";
 
 // ========================================
 // シフトカレンダー（SCR-SHF-003）
 // 検索フォーム・12カラムテーブル・一括公開・割当モーダル連携
+// バックエンドはページネーション非対応のため全件取得
 // ========================================
 
 /** 曜日キーとラベルの対応 */
@@ -85,19 +86,9 @@ export function ShiftCalendar() {
   const [weekTo, setWeekTo] = useState(() => addWeeks(getThisMonday(), 3));
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // テーブルデータ
+  // テーブルデータ（バックエンドはページネーション非対応のため全件取得）
   const [data, setData] = useState<ScheduleItem[]>([]);
-  const [pageInfo, setPageInfo] = useState<PageInfo>({
-    number: 0,
-    size: 20,
-    totalElements: 0,
-    totalPages: 0,
-  });
   const [loading, setLoading] = useState(false);
-
-  // ソート（デフォルト: 週開始日昇順）
-  const [sortKey, setSortKey] = useState("weekStartDate");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   // 行選択（DRAFTスケジュールのみ選択可）
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -115,20 +106,20 @@ export function ShiftCalendar() {
   // データ取得
   // ========================================
   const loadData = useCallback(
-    async (page = 0) => {
+    async () => {
       setLoading(true);
       try {
         const params: ScheduleListParams = {
           weekFrom,
           weekTo,
-          status: statusFilter === "ALL" ? undefined : statusFilter,
-          page,
-          size: 20,
-          sort: `${sortKey},${sortDir}`,
         };
-        const result = await fetchSchedules(params);
-        setData(result.content);
-        setPageInfo(result.page);
+        // バックエンドは配列を直接返す（ページネーション非対応）
+        let result = await fetchSchedules(params);
+        // フロントエンド側でステータスフィルタを適用する
+        if (statusFilter !== "ALL") {
+          result = result.filter((s) => s.status === statusFilter);
+        }
+        setData(result);
         setSelectedIds([]);
       } catch (err) {
         toast.apiError(err);
@@ -136,7 +127,7 @@ export function ShiftCalendar() {
         setLoading(false);
       }
     },
-    [weekFrom, weekTo, statusFilter, sortKey, sortDir, toast]
+    [weekFrom, weekTo, statusFilter, toast]
   );
 
   // 初回読み込み
@@ -147,20 +138,13 @@ export function ShiftCalendar() {
   // ========================================
   // ハンドラー
   // ========================================
-  const handleSearch = () => loadData(0);
+  const handleSearch = () => loadData();
 
   const handleClear = () => {
     const monday = getThisMonday();
     setWeekFrom(monday);
     setWeekTo(addWeeks(monday, 3));
     setStatusFilter("ALL");
-  };
-
-  const handlePageChange = (page: number) => loadData(page);
-
-  const handleSortChange = (key: string, direction: "asc" | "desc") => {
-    setSortKey(key);
-    setSortDir(direction);
   };
 
   // 行選択トグル（DRAFTスケジュールのみ許可）
@@ -206,7 +190,7 @@ export function ShiftCalendar() {
   const handleAssignComplete = () => {
     setAssignModalOpen(false);
     setEditTarget(null);
-    loadData(pageInfo.number);
+    loadData();
   };
 
   // ========================================
@@ -239,7 +223,7 @@ export function ShiftCalendar() {
         `${successCount}/${selectedIds.length} 件を公開しました。${failCount} 件は公開できませんでした。`
       );
     }
-    loadData(pageInfo.number);
+    loadData();
   };
 
   // ========================================
@@ -264,14 +248,16 @@ export function ShiftCalendar() {
     },
     {
       key: "employeeName",
-      label: "従業員名",
-      sortable: true,
+      label: "従業員",
       headerClassName: "w-[120px]",
+      // employeeName がバックエンドから返らないため employeeId を表示する
+      render: (row) => (
+        <span className="text-sm">{row.employeeName || row.employeeId}</span>
+      ),
     },
     {
       key: "weekStartDate",
       label: "週開始",
-      sortable: true,
       headerClassName: "w-[80px]",
       render: (row) => (
         <span className="font-mono text-sm">
@@ -362,7 +348,7 @@ export function ShiftCalendar() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">
-            {pageInfo.totalElements} 件
+            {data.length} 件
           </span>
           {/* DRAFT行の全選択チェックボックス */}
           {draftIds.length > 0 && (
@@ -401,10 +387,6 @@ export function ShiftCalendar() {
         loading={loading}
         emptyMessage="シフトスケジュールがありません"
         pagination={{ pageSize: 20 }}
-        totalItems={pageInfo.totalElements}
-        currentPage={pageInfo.number}
-        onPageChange={handlePageChange}
-        onSortChange={handleSortChange}
         onRowClick={isManager ? handleRowClick : undefined}
       />
 

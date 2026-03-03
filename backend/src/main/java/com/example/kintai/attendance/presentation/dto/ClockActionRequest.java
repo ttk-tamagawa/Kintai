@@ -28,7 +28,7 @@ import java.util.UUID;
  */
 public record ClockActionRequest(
         @NotNull(message = "従業員IDは必須です")
-        UUID employeeId,
+        String employeeId,
 
         @NotNull(message = "打刻時刻は必須です")
         OffsetDateTime clockTime,

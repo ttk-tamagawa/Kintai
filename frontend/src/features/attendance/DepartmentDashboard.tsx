@@ -73,8 +73,10 @@ export function DepartmentDashboard() {
           month,
           page,
           size: 20,
-          sort: `${sortKey},${sortDir}`,
+          sortField: sortKey,
+          sortDirection: sortDir,
         };
+        // api.ts 側でレスポンス変換済み（{ kpi, previousMonth, content, page: PageInfo }）
         const result = await fetchDepartmentDashboard(params);
         setKpi(result.kpi);
         setPrevKpi(result.previousMonth);

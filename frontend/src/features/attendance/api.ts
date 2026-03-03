@@ -6,8 +6,10 @@ import type {
   BreakStartResponse,
   BreakEndResponse,
   DailyAttendanceResponse,
+  DailyAttendanceItem,
   MonthlySummaryResponse,
   DepartmentDashboardResponse,
+  PageInfo,
 } from "@/types";
 
 // ========================================
@@ -15,14 +17,45 @@ import type {
 // 全ての勤怠関連APIエンドポイントの呼び出し関数
 // ========================================
 
+// --- ユーティリティ ---
+
+/** "YYYY-MM" 形式を { year, month } に分割する */
+function parseYearMonth(ym: string): { year: number; month: number } {
+  const [y, m] = ym.split("-").map(Number);
+  return { year: y, month: m };
+}
+
+/** バックエンドのフラットなページネーションを PageInfo に変換する */
+function toPageInfo(raw: {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}): PageInfo {
+  return {
+    number: raw.page,
+    size: raw.size,
+    totalElements: raw.totalElements,
+    totalPages: raw.totalPages,
+  };
+}
+
 // --- 打刻系 API ---
 
-/** 本日の勤怠ステータスを取得する */
-export async function fetchTodayAttendance(): Promise<TodayAttendance | null> {
-  const { data } = await api.get("/attendances/today");
-  // レコードが存在しない場合、空オブジェクト {} が返る
-  if (!data || !data.status) return null;
-  return data as TodayAttendance;
+/** 本日の勤怠ステータスを取得する（employeeId をクエリパラメータとして送信） */
+export async function fetchTodayAttendance(
+  employeeId: string
+): Promise<TodayAttendance | null> {
+  const response = await api.get("/attendances/today", {
+    params: { employeeId },
+    // 204 No Content の場合は null を返す
+    validateStatus: (status: number) => status === 200 || status === 204,
+  });
+  // 204 No Content またはデータなしの場合
+  if (response.status === 204 || !response.data || !response.data.status) {
+    return null;
+  }
+  return response.data as TodayAttendance;
 }
 
 /** 出勤打刻を実行する */
@@ -89,15 +122,19 @@ export interface DailyAttendanceParams {
   sortDirection?: string;
 }
 
-/** 日次勤怠一覧を取得する */
+/** 日次勤怠一覧を取得する（レスポンスのフラットなページネーションを PageInfo に変換） */
 export async function fetchDailyAttendances(
   params: DailyAttendanceParams
-): Promise<DailyAttendanceResponse> {
+): Promise<{ content: DailyAttendanceItem[]; page: PageInfo }> {
   const { data } = await api.get<DailyAttendanceResponse>(
     "/attendances/daily",
     { params }
   );
-  return data;
+  // バックエンドのフラットな構造 → フロントエンド用に変換
+  return {
+    content: data.content,
+    page: toPageInfo(data),
+  };
 }
 
 /** 月次サマリーのクエリパラメータ */
@@ -106,30 +143,51 @@ export interface MonthlySummaryParams {
   month?: string;
   page?: number;
   size?: number;
-  sort?: string;
+  sortField?: string;
+  sortDirection?: string;
 }
 
-/** 月次勤怠サマリーを取得する */
+/** 月次勤怠サマリーを取得する（month を year/month に分割、レスポンス構造を変換） */
 export async function fetchMonthlySummary(
   params: MonthlySummaryParams
-): Promise<MonthlySummaryResponse> {
+): Promise<{
+  kpi: MonthlySummaryResponse["kpi"];
+  content: MonthlySummaryResponse["employees"]["content"];
+  page: PageInfo;
+}> {
+  // month "YYYY-MM" → year, month に分割する
+  const yearMonth = params.month ? parseYearMonth(params.month) : {};
   const { data } = await api.get<MonthlySummaryResponse>(
     "/attendances/monthly-summary",
-    { params }
+    {
+      params: {
+        departmentId: params.departmentId,
+        ...yearMonth,
+        page: params.page,
+        size: params.size,
+        sortField: params.sortField,
+        sortDirection: params.sortDirection,
+      },
+    }
   );
-  return data;
+  // バックエンドの { kpi, employees: { content, page, ... } } → フロントエンド用に変換
+  return {
+    kpi: data.kpi,
+    content: data.employees.content,
+    page: toPageInfo(data.employees),
+  };
 }
 
-/** 月次サマリーCSVをダウンロードする */
+/** 月次サマリーCSVをダウンロードする（month を year/month に分割） */
 export async function exportMonthlySummary(
   departmentId?: string,
   month?: string
 ): Promise<void> {
+  const yearMonth = month ? parseYearMonth(month) : {};
   const response = await api.get("/attendances/monthly-summary/export", {
-    params: { departmentId, month },
+    params: { departmentId, ...yearMonth },
     responseType: "blob",
   });
-  // Blobからダウンロードリンクを生成する
   downloadBlob(response.data, `monthly-summary_${month ?? "all"}.csv`);
 }
 
@@ -139,27 +197,50 @@ export interface DepartmentDashboardParams {
   month?: string;
   page?: number;
   size?: number;
-  sort?: string;
+  sortField?: string;
+  sortDirection?: string;
 }
 
-/** 部門別勤怠ダッシュボードを取得する */
+/** 部門別勤怠ダッシュボードを取得する（month を year/month に分割、レスポンス構造を変換） */
 export async function fetchDepartmentDashboard(
   params: DepartmentDashboardParams
-): Promise<DepartmentDashboardResponse> {
+): Promise<{
+  kpi: DepartmentDashboardResponse["kpi"];
+  previousMonth: DepartmentDashboardResponse["previousMonth"];
+  content: DepartmentDashboardResponse["departments"]["content"];
+  page: PageInfo;
+}> {
+  const yearMonth = params.month ? parseYearMonth(params.month) : {};
   const { data } = await api.get<DepartmentDashboardResponse>(
     "/attendances/department-dashboard",
-    { params }
+    {
+      params: {
+        departmentId: params.departmentId,
+        ...yearMonth,
+        page: params.page,
+        size: params.size,
+        sortField: params.sortField,
+        sortDirection: params.sortDirection,
+      },
+    }
   );
-  return data;
+  // バックエンドの { kpi, previousMonth, departments: { content, page, ... } } → フロントエンド用に変換
+  return {
+    kpi: data.kpi,
+    previousMonth: data.previousMonth,
+    content: data.departments.content,
+    page: toPageInfo(data.departments),
+  };
 }
 
-/** 部門ダッシュボードCSVをダウンロードする */
+/** 部門ダッシュボードCSVをダウンロードする（month を year/month に分割） */
 export async function exportDepartmentDashboard(
   departmentId?: string,
   month?: string
 ): Promise<void> {
+  const yearMonth = month ? parseYearMonth(month) : {};
   const response = await api.get("/attendances/department-dashboard/export", {
-    params: { departmentId, month },
+    params: { departmentId, ...yearMonth },
     responseType: "blob",
   });
   downloadBlob(response.data, `department-dashboard_${month ?? "all"}.csv`);

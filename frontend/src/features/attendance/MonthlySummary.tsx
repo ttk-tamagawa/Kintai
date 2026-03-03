@@ -69,8 +69,10 @@ export function MonthlySummary() {
           month,
           page,
           size: 20,
-          sort: `${sortKey},${sortDir}`,
+          sortField: sortKey,
+          sortDirection: sortDir,
         };
+        // api.ts 側でレスポンス変換済み（{ kpi, content, page: PageInfo }）
         const result = await fetchMonthlySummary(params);
         setKpi(result.kpi);
         setData(result.content);

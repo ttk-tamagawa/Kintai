@@ -21,7 +21,7 @@ import java.util.UUID;
  */
 public record ClockOutResponse(
         UUID attendanceId,
-        UUID employeeId,
+        String employeeId,
         LocalDate workDate,
         String status,
         Instant clockIn,

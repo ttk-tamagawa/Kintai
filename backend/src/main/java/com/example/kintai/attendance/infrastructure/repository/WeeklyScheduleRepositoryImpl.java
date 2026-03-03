@@ -131,7 +131,7 @@ public class WeeklyScheduleRepositoryImpl implements WeeklyScheduleRepository {
 
         return new WeeklyScheduleJpaEntity(
                 schedule.getId().value(),
-                UUID.fromString(schedule.getEmployeeId().value()),
+                schedule.getEmployeeId().value(),
                 schedule.getWeekStartDate(),
                 schedule.getStatus().name(),
                 getPatternUuid(assignments, DayOfWeek.MONDAY),

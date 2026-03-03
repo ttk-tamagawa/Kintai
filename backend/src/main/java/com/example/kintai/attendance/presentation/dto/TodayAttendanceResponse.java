@@ -23,7 +23,7 @@ import java.util.UUID;
  */
 public record TodayAttendanceResponse(
         UUID attendanceId,
-        UUID employeeId,
+        String employeeId,
         LocalDate workDate,
         String status,
         Instant clockIn,

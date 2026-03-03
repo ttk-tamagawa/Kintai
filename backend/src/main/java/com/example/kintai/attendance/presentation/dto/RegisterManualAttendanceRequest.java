@@ -22,7 +22,7 @@ import java.util.UUID;
  * @param shiftPatternId シフトパターンID（任意、シフト制の場合に指定）
  */
 public record RegisterManualAttendanceRequest(
-        @NotNull UUID employeeId,
+        @NotNull String employeeId,
         @NotNull LocalDate workDate,
         @NotNull OffsetDateTime startTime,
         @NotNull OffsetDateTime endTime,

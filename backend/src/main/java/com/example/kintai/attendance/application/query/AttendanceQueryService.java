@@ -65,7 +65,7 @@ public class AttendanceQueryService {
      */
     public record TodayAttendanceResult(
             UUID attendanceId,
-            UUID employeeId,
+            String employeeId,
             LocalDate workDate,
             String status,
             Instant clockIn,
@@ -101,7 +101,7 @@ public class AttendanceQueryService {
      * 月次サマリー行 — 従業員別テーブルの1行（分→時間変換済み）
      */
     public record MonthlySummaryRow(
-            UUID employeeId,
+            String employeeId,
             String employeeName,
             int workDays,
             double totalWorkHours,

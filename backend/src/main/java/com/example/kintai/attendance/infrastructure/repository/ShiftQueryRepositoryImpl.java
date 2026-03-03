@@ -100,6 +100,28 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
+    public List<ScheduleSummary> findAllSchedules(LocalDate from, LocalDate to) {
+        // 全従業員の週次スケジュールサマリーを期間で取得（週開始日昇順）
+        List<WeeklyScheduleSummaryJpaEntity> entities = entityManager.createQuery(
+                "SELECT s FROM WeeklyScheduleSummaryJpaEntity s " +
+                "WHERE s.weekStartDate BETWEEN :from AND :to " +
+                "AND s.deletedAt IS NULL " +
+                "ORDER BY s.weekStartDate ASC, s.employeeId ASC"
+        )
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .getResultList();
+
+        // JPAエンティティ → ScheduleSummary DTOに変換
+        List<ScheduleSummary> result = new ArrayList<>();
+        for (WeeklyScheduleSummaryJpaEntity e : entities) {
+            result.add(toScheduleSummary(e));
+        }
+        return result;
+    }
+
+    @Override
     public Optional<ScheduleSummary> findScheduleById(UUID scheduleId) {
         // weekly_schedule_summariesテーブルからIDで検索
         WeeklyScheduleSummaryJpaEntity entity = entityManager.find(

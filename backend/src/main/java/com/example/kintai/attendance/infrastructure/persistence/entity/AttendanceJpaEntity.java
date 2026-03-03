@@ -26,9 +26,9 @@ public class AttendanceJpaEntity {
     @Column(name = "id")
     private UUID id;
 
-    /** 従業員ID */
-    @Column(name = "employee_id", nullable = false)
-    private UUID employeeId;
+    /** 従業員ID（VARCHAR(36): employees テーブルに合わせた文字列型） */
+    @Column(name = "employee_id", nullable = false, length = 36)
+    private String employeeId;
 
     /** 勤務日 */
     @Column(name = "work_date", nullable = false)
@@ -74,7 +74,7 @@ public class AttendanceJpaEntity {
      * 全フィールド指定コンストラクタ — リポジトリ実装から使用する
      */
     public AttendanceJpaEntity(
-            UUID id, UUID employeeId, LocalDate workDate, UUID shiftPatternId,
+            UUID id, String employeeId, LocalDate workDate, UUID shiftPatternId,
             String status, int version, Instant createdAt, Instant updatedAt,
             String createdBy, String updatedBy
     ) {
@@ -93,7 +93,7 @@ public class AttendanceJpaEntity {
     // ゲッター
 
     public UUID getId() { return id; }
-    public UUID getEmployeeId() { return employeeId; }
+    public String getEmployeeId() { return employeeId; }
     public LocalDate getWorkDate() { return workDate; }
     public UUID getShiftPatternId() { return shiftPatternId; }
     public String getStatus() { return status; }

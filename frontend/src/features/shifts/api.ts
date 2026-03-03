@@ -1,9 +1,7 @@
 import api from "@/lib/api";
 import type {
   ShiftPattern,
-  ShiftPatternsResponse,
   ScheduleItem,
-  ShiftSchedulesResponse,
   DayOfWeek,
 } from "@/types";
 
@@ -17,9 +15,6 @@ import type {
 /** シフトパターン一覧のクエリパラメータ */
 export interface PatternListParams {
   isActive?: boolean;
-  page?: number;
-  size?: number;
-  sort?: string;
 }
 
 /** シフトパターン一覧を取得する（バックエンドは配列を直接返す） */
@@ -32,12 +27,12 @@ export async function fetchPatterns(
   return data;
 }
 
-/** 有効なシフトパターンのみ取得する（割当セレクト用） */
+/** 有効なシフトパターンのみ取得する（割当セレクト用。バックエンドは配列を直接返す） */
 export async function fetchActivePatterns(): Promise<ShiftPattern[]> {
-  const { data } = await api.get<ShiftPatternsResponse>("/shifts/patterns", {
-    params: { isActive: true, size: 100 },
+  const { data } = await api.get<ShiftPattern[]>("/shifts/patterns", {
+    params: { activeOnly: true },
   });
-  return data.content;
+  return data;
 }
 
 /** シフトパターン登録リクエスト */
@@ -74,21 +69,59 @@ export interface ScheduleListParams {
   employeeId?: string;
   weekFrom?: string;
   weekTo?: string;
-  status?: string;
-  page?: number;
-  size?: number;
-  sort?: string;
 }
 
-/** スケジュール一覧（カレンダー）を取得する */
+/** バックエンドの ScheduleResponse の型（DayAssignment に startTime/endTime がない） */
+interface BackendScheduleResponse {
+  scheduleId: string;
+  employeeId: string;
+  weekStartDate: string;
+  status: string;
+  assignments: Record<string, { patternId: string; patternName: string }>;
+  assignedDays: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** スケジュール一覧を取得する（バックエンドは配列を直接返す） */
 export async function fetchSchedules(
   params: ScheduleListParams
-): Promise<ShiftSchedulesResponse> {
-  const { data } = await api.get<ShiftSchedulesResponse>(
+): Promise<ScheduleItem[]> {
+  const { data } = await api.get<BackendScheduleResponse[]>(
     "/shifts/schedules",
-    { params }
+    {
+      params: {
+        employeeId: params.employeeId,
+        weekFrom: params.weekFrom,
+        weekTo: params.weekTo,
+      },
+    }
   );
-  return data;
+  // バックエンドのレスポンスをフロントエンドの ScheduleItem に変換する
+  return data.map(toScheduleItem);
+}
+
+/** バックエンドの ScheduleResponse → フロントエンドの ScheduleItem に変換する */
+function toScheduleItem(raw: BackendScheduleResponse): ScheduleItem {
+  const assignments: Partial<Record<DayOfWeek, { patternId: string; patternName: string; startTime: string; endTime: string }>> = {};
+  for (const [day, val] of Object.entries(raw.assignments)) {
+    assignments[day as DayOfWeek] = {
+      patternId: val.patternId,
+      patternName: val.patternName,
+      // バックエンドの DayAssignment に startTime/endTime がないためデフォルト値を設定
+      startTime: "",
+      endTime: "",
+    };
+  }
+  return {
+    scheduleId: raw.scheduleId,
+    employeeId: raw.employeeId,
+    // バックエンドに employeeName がないため空文字で代替
+    employeeName: "",
+    weekStartDate: raw.weekStartDate,
+    status: raw.status as ScheduleItem["status"],
+    assignments,
+  };
 }
 
 /** スケジュール新規割当リクエスト */
@@ -102,8 +135,8 @@ export interface CreateScheduleRequest {
 export async function createSchedule(
   req: CreateScheduleRequest
 ): Promise<ScheduleItem> {
-  const { data } = await api.post<ScheduleItem>("/shifts/schedules", req);
-  return data;
+  const { data } = await api.post<BackendScheduleResponse>("/shifts/schedules", req);
+  return toScheduleItem(data);
 }
 
 /** スケジュール変更リクエスト */
@@ -116,11 +149,11 @@ export async function updateSchedule(
   scheduleId: string,
   req: UpdateScheduleRequest
 ): Promise<ScheduleItem> {
-  const { data } = await api.put<ScheduleItem>(
+  const { data } = await api.put<BackendScheduleResponse>(
     `/shifts/schedules/${scheduleId}`,
     req
   );
-  return data;
+  return toScheduleItem(data);
 }
 
 /** スケジュールを公開する */
@@ -136,11 +169,20 @@ export interface EmployeeOption {
   employeeName: string;
 }
 
-/** 従業員一覧を取得する（部門配下の従業員） */
+/**
+ * 従業員一覧を取得する
+ * 注意: バックエンドに /employees エンドポイントが存在しないため、
+ * エラーを握り潰して空配列を返す（ShiftAssignModal のフォールバック入力にまかせる）
+ */
 export async function fetchEmployees(): Promise<EmployeeOption[]> {
-  const { data } = await api.get<{ content: EmployeeOption[] }>(
-    "/employees",
-    { params: { size: 100 } }
-  );
-  return data.content;
+  try {
+    const { data } = await api.get<{ content: EmployeeOption[] }>(
+      "/employees",
+      { params: { size: 100 } }
+    );
+    return data.content;
+  } catch {
+    // バックエンドに /employees エンドポイントがない場合は空配列を返す
+    return [];
+  }
 }

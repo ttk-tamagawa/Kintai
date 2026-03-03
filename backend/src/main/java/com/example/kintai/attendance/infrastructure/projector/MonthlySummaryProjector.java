@@ -42,10 +42,10 @@ public class MonthlySummaryProjector {
      * 月次サマリー（monthly_attendance_summaries）をUPSERTする。
      * 従業員名・部門IDはemployeesテーブルから取得して非正規化する。</p>
      *
-     * @param employeeId 従業員ID（UUID）
+     * @param employeeId 従業員ID（文字列）
      * @param workDate   基準となる勤務日（年月の特定に使用）
      */
-    public void recalculate(UUID employeeId, LocalDate workDate) {
+    public void recalculate(String employeeId, LocalDate workDate) {
         short year = (short) workDate.getYear();
         short month = (short) workDate.getMonthValue();
 
@@ -109,7 +109,7 @@ public class MonthlySummaryProjector {
      * 出勤日数・勤務時間・残業時間等を計算する。
      * CLOCKED_OUTまたはFINALIZEDのレコードを出勤日としてカウントする。</p>
      */
-    private Object[] aggregateDailySummaries(UUID employeeId, short year, short month) {
+    private Object[] aggregateDailySummaries(String employeeId, short year, short month) {
         try {
             return (Object[]) entityManager.createQuery(
                     // CLOCKED_OUT/FINALIZEDの日数を出勤日数としてカウントする
@@ -139,15 +139,15 @@ public class MonthlySummaryProjector {
      * employeesテーブルから従業員名と部門IDを取得する
      *
      * <p>月次サマリーに非正規化して保持するための従業員情報を取得する。
-     * employeesテーブルのemployee_idはVARCHAR(36)のため、UUIDを文字列変換して検索する。</p>
+     * employeesテーブルのemployee_idはVARCHAR(36)のため文字列で検索する。</p>
      */
-    private Object[] lookupEmployeeInfo(UUID employeeId) {
+    private Object[] lookupEmployeeInfo(String employeeId) {
         try {
             return (Object[]) entityManager.createNativeQuery(
                     // 従業員名と部門IDを取得する
                     "SELECT name, department_id FROM employees WHERE employee_id = :id"
             )
-            .setParameter("id", employeeId.toString())
+            .setParameter("id", employeeId)
             .getSingleResult();
         } catch (NoResultException e) {
             return null;
@@ -161,7 +161,7 @@ public class MonthlySummaryProjector {
      * 初回はUUIDを自動生成して新規エンティティを作成する。</p>
      */
     private MonthlySummaryJpaEntity findOrCreateMonthlySummary(
-            UUID employeeId, String employeeName, String departmentId,
+            String employeeId, String employeeName, String departmentId,
             short year, short month) {
 
         // employee_id + year + month で既存レコードを検索する

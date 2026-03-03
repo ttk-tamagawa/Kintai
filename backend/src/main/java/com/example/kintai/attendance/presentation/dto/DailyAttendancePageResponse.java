@@ -45,7 +45,7 @@ public record DailyAttendancePageResponse(
      */
     public record DailyAttendanceRow(
             UUID attendanceId,
-            UUID employeeId,
+            String employeeId,
             LocalDate workDate,
             String status,
             Instant clockInTime,

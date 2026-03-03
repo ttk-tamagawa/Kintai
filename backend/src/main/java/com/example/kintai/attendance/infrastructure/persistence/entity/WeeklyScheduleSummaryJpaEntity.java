@@ -26,9 +26,9 @@ public class WeeklyScheduleSummaryJpaEntity {
     @Column(name = "weekly_schedule_id")
     private UUID weeklyScheduleId;
 
-    /** 従業員ID */
-    @Column(name = "employee_id", nullable = false)
-    private UUID employeeId;
+    /** 従業員ID（VARCHAR(36): employees テーブルに合わせた文字列型） */
+    @Column(name = "employee_id", nullable = false, length = 36)
+    private String employeeId;
 
     /** 週の開始日（月曜日） */
     @Column(name = "week_start_date", nullable = false)
@@ -140,7 +140,7 @@ public class WeeklyScheduleSummaryJpaEntity {
      * @param weekStartDate    週の開始日（月曜日）
      * @param status           スケジュールステータス
      */
-    public WeeklyScheduleSummaryJpaEntity(UUID weeklyScheduleId, UUID employeeId,
+    public WeeklyScheduleSummaryJpaEntity(UUID weeklyScheduleId, String employeeId,
                                            LocalDate weekStartDate, String status) {
         this.weeklyScheduleId = weeklyScheduleId;
         this.employeeId = employeeId;
@@ -158,7 +158,7 @@ public class WeeklyScheduleSummaryJpaEntity {
     // ゲッター
 
     public UUID getWeeklyScheduleId() { return weeklyScheduleId; }
-    public UUID getEmployeeId() { return employeeId; }
+    public String getEmployeeId() { return employeeId; }
     public LocalDate getWeekStartDate() { return weekStartDate; }
     public String getStatus() { return status; }
     public UUID getMondayPatternId() { return mondayPatternId; }

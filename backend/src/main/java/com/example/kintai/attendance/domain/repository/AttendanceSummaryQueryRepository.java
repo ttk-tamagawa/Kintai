@@ -29,7 +29,7 @@ public interface AttendanceSummaryQueryRepository {
      */
     record DailySummary(
             UUID attendanceId,
-            UUID employeeId,
+            String employeeId,
             LocalDate workDate,
             String status,
             Instant clockInTime,
@@ -50,7 +50,7 @@ public interface AttendanceSummaryQueryRepository {
      */
     record MonthlySummary(
             UUID id,
-            UUID employeeId,
+            String employeeId,
             String employeeName,
             String departmentId,
             int year,

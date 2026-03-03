@@ -3,8 +3,6 @@ package com.example.kintai.shared.infrastructure;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 /**
  * アクセス制御コンポーネント — データレベルの認可チェックを提供する
  *
@@ -25,11 +23,15 @@ public class AccessControl {
     /**
      * 従業員IDベースのアクセス制御 — EMPLOYEEは自分のみ、MANAGER/HR/ADMINは全員OK
      *
+     * <p>パラメータ型はObjectで受け取る（String / UUID 両方に対応）。
+     * コントローラーのクエリパラメータ（String）とリクエストDTO（UUID）の
+     * いずれからも @PreAuthorize のSpEL式で呼び出せる。</p>
+     *
      * @param authentication SecurityContextの認証情報
-     * @param targetEmployeeId アクセス対象の従業員ID
+     * @param targetEmployeeId アクセス対象の従業員ID（String または UUID）
      * @return アクセス許可ならtrue
      */
-    public boolean canAccessEmployee(Authentication authentication, UUID targetEmployeeId) {
+    public boolean canAccessEmployee(Authentication authentication, Object targetEmployeeId) {
         AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
 
         // MANAGER / HR / ADMIN は全従業員にアクセス可能
@@ -37,7 +39,7 @@ public class AccessControl {
             return true;
         }
 
-        // EMPLOYEE は自分の employeeId のみアクセス可能
+        // EMPLOYEE は自分の employeeId のみアクセス可能（toString で統一比較）
         return user.employeeId().equals(targetEmployeeId.toString());
     }
 

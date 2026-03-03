@@ -64,10 +64,10 @@ public class AttendanceSummaryProjector {
     public void on(ClockedInEvent event) {
         log.debug("ClockedInEvent受信: attendanceId={}", event.attendanceRecordId().value());
 
-        // サマリーを取得または新規作成する（EmployeeId: String→UUID変換）
+        // サマリーを取得または新規作成する（EmployeeId の文字列値を使用）
         AttendanceSummaryJpaEntity entity = findOrCreate(
                 event.attendanceRecordId().value(),
-                UUID.fromString(event.employeeId().value()),
+                event.employeeId().value(),
                 event.workDate().value()
         );
 
@@ -240,10 +240,10 @@ public class AttendanceSummaryProjector {
         log.debug("ManualAttendanceRegisteredEvent受信: attendanceId={}",
                 event.attendanceRecordId().value());
 
-        // サマリーを取得または新規作成する（EmployeeId: String→UUID変換）
+        // サマリーを取得または新規作成する（EmployeeId の文字列値を使用）
         AttendanceSummaryJpaEntity entity = findOrCreate(
                 event.attendanceRecordId().value(),
-                UUID.fromString(event.employeeId().value()),
+                event.employeeId().value(),
                 event.workDate().value()
         );
 
@@ -297,7 +297,7 @@ public class AttendanceSummaryProjector {
      * <p>CLOCKED_INイベントやMANUAL_REGISTEREDイベントで使用する。
      * 初回イベントではサマリーが存在しないため新規作成する。</p>
      */
-    private AttendanceSummaryJpaEntity findOrCreate(UUID attendanceId, UUID employeeId,
+    private AttendanceSummaryJpaEntity findOrCreate(UUID attendanceId, String employeeId,
                                                      LocalDate workDate) {
         AttendanceSummaryJpaEntity entity = entityManager.find(
                 AttendanceSummaryJpaEntity.class, attendanceId);

@@ -25,9 +25,9 @@ public class MonthlySummaryJpaEntity {
     @Column(name = "id")
     private UUID id;
 
-    /** 従業員ID */
-    @Column(name = "employee_id", nullable = false)
-    private UUID employeeId;
+    /** 従業員ID（VARCHAR(36): employees テーブルに合わせた文字列型） */
+    @Column(name = "employee_id", nullable = false, length = 36)
+    private String employeeId;
 
     /** 従業員名（非正規化: 表示用） */
     @Column(name = "employee_name", nullable = false)
@@ -105,7 +105,7 @@ public class MonthlySummaryJpaEntity {
      * @param year         年
      * @param month        月（1〜12）
      */
-    public MonthlySummaryJpaEntity(UUID id, UUID employeeId, String employeeName,
+    public MonthlySummaryJpaEntity(UUID id, String employeeId, String employeeName,
                                    String departmentId, short year, short month) {
         this.id = id;
         this.employeeId = employeeId;
@@ -130,7 +130,7 @@ public class MonthlySummaryJpaEntity {
     // ゲッター
 
     public UUID getId() { return id; }
-    public UUID getEmployeeId() { return employeeId; }
+    public String getEmployeeId() { return employeeId; }
     public String getEmployeeName() { return employeeName; }
     public String getDepartmentId() { return departmentId; }
     public short getYear() { return year; }

@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.presentation.dto;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * 月次勤怠サマリーレスポンスDTO — GET /api/v1/attendances/monthly-summary の返却値
@@ -66,7 +65,7 @@ public record MonthlySummaryResponse(
      * @param paidLeaveUsed    有給消化日数
      */
     public record EmployeeRow(
-            UUID employeeId,
+            String employeeId,
             String employeeName,
             int workDays,
             double totalWorkHours,

@@ -19,7 +19,7 @@ import java.util.UUID;
  */
 public record FinalizeResponse(
         UUID attendanceId,
-        UUID employeeId,
+        String employeeId,
         LocalDate workDate,
         String status,
         UUID monthlyClosingId,

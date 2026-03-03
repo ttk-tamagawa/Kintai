@@ -154,7 +154,7 @@ public class AttendanceRecordRepositoryImpl implements AttendanceRecordRepositor
 
         return new AttendanceJpaEntity(
                 record.getId().value(),
-                UUID.fromString(record.getEmployeeId().value()),
+                record.getEmployeeId().value(),
                 record.getWorkDate().value(),
                 shiftPatternId,
                 record.getStatus().name(),

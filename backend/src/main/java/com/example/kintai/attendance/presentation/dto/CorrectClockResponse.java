@@ -22,7 +22,7 @@ import java.util.UUID;
  */
 public record CorrectClockResponse(
         UUID attendanceId,
-        UUID employeeId,
+        String employeeId,
         LocalDate workDate,
         String status,
         String correctedType,

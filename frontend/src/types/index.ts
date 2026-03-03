@@ -90,7 +90,7 @@ export interface BreakEndResponse {
   updatedAt: string;
 }
 
-/** 本日の勤怠情報 */
+/** 本日の勤怠情報（バックエンド TodayAttendanceResponse に準拠） */
 export interface TodayAttendance {
   attendanceId: string | null;
   employeeId: string;
@@ -99,23 +99,28 @@ export interface TodayAttendance {
   clockIn: string | null;
   clockOut: string | null;
   breakMinutes: number;
-  netWorkMinutes: number;
-  overtimeMinutes: number;
-  onBreak: boolean;
+  netWorkMinutes: number | null;
+  totalOvertimeMinutes: number | null;
+  updatedAt: string;
 }
 
-/** 日次勤怠一覧のアイテム */
+/** 日次勤怠一覧のアイテム（バックエンド DailyAttendanceRow に準拠） */
 export interface DailyAttendanceItem {
   attendanceId: string;
   employeeId: string;
-  employeeName: string;
   workDate: string;
-  clockIn: string | null;
-  clockOut: string | null;
+  status: AttendanceStatus;
+  clockInTime: string | null;
+  clockOutTime: string | null;
+  scheduledMinutes: number;
+  actualMinutes: number;
   breakMinutes: number;
   netWorkMinutes: number;
-  overtimeMinutes: number;
-  status: AttendanceStatus;
+  regularOvertimeMinutes: number;
+  lateNightMinutes: number;
+  holidayMinutes: number;
+  totalOvertimeMinutes: number;
+  updatedAt: string;
 }
 
 /** 月次サマリーのKPI（APIレスポンスのフィールド名に準拠） */
@@ -140,11 +145,16 @@ export interface MonthlyEmployeeSummary {
   paidLeaveUsed: number;
 }
 
-/** 月次サマリーAPIのフルレスポンス */
+/** 月次サマリーAPIのフルレスポンス（バックエンドの構造に準拠） */
 export interface MonthlySummaryResponse {
   kpi: MonthlySummaryKpi;
-  content: MonthlyEmployeeSummary[];
-  page: PageInfo;
+  employees: {
+    content: MonthlyEmployeeSummary[];
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 
 /** 部門ダッシュボードのKPI（APIレスポンスのフィールド名に準拠） */
@@ -167,12 +177,17 @@ export interface DepartmentDashboardItem {
   attendanceRate: number;
 }
 
-/** 部門ダッシュボードAPIのフルレスポンス */
+/** 部門ダッシュボードAPIのフルレスポンス（バックエンドの構造に準拠） */
 export interface DepartmentDashboardResponse {
   kpi: DepartmentDashboardKpi;
   previousMonth: DepartmentDashboardKpi;
-  content: DepartmentDashboardItem[];
-  page: PageInfo;
+  departments: {
+    content: DepartmentDashboardItem[];
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+  };
 }
 
 /** ページ情報（APIレスポンス共通） */
@@ -183,10 +198,13 @@ export interface PageInfo {
   totalPages: number;
 }
 
-/** 日次勤怠一覧APIのフルレスポンス */
+/** 日次勤怠一覧APIのフルレスポンス（バックエンドのフラットなページネーションに準拠） */
 export interface DailyAttendanceResponse {
   content: DailyAttendanceItem[];
-  page: PageInfo;
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }
 
 /** ページネーションレスポンス（汎用） */

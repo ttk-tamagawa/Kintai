@@ -57,14 +57,15 @@ public class WeeklyScheduleQueryService {
      * <p>処理フロー:
      * <ol>
      *   <li>from/toが省略された場合はデフォルト値を設定する（今週の月曜〜4週先の日曜）</li>
+     *   <li>employeeIdが省略された場合は全従業員のスケジュールを返す（カレンダー表示用）</li>
      *   <li>ShiftQueryRepositoryからRead Modelを参照してスケジュール一覧を取得する</li>
      * </ol>
      * </p>
      *
-     * @param employeeId 従業員ID
+     * @param employeeId 従業員ID（nullの場合は全従業員分を返却）
      * @param from       検索開始日（nullの場合は今週の月曜日）
      * @param to         検索終了日（nullの場合はfromから4週先の日曜日）
-     * @return スケジュール概要のリスト（週開始日降順）
+     * @return スケジュール概要のリスト
      */
     public List<ScheduleSummary> getSchedules(UUID employeeId, LocalDate from, LocalDate to) {
         log.debug("スケジュール一覧取得: employeeId={}, from={}, to={}", employeeId, from, to);
@@ -74,10 +75,15 @@ public class WeeklyScheduleQueryService {
         LocalDate effectiveTo = (to != null) ? to : effectiveFrom.plusWeeks(DEFAULT_WEEKS_AHEAD)
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
 
-        // ShiftQueryRepositoryからRead Modelを参照してスケジュール一覧を取得する
-        List<ScheduleSummary> schedules = shiftQueryRepository.findSchedules(
-                EmployeeId.of(employeeId), effectiveFrom, effectiveTo
-        );
+        // employeeIdが省略された場合は全従業員のスケジュールを返す
+        List<ScheduleSummary> schedules;
+        if (employeeId != null) {
+            schedules = shiftQueryRepository.findSchedules(
+                    EmployeeId.of(employeeId), effectiveFrom, effectiveTo
+            );
+        } else {
+            schedules = shiftQueryRepository.findAllSchedules(effectiveFrom, effectiveTo);
+        }
 
         log.debug("スケジュール一覧取得完了: {}件", schedules.size());
         return schedules;

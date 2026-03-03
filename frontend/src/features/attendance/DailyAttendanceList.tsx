@@ -144,19 +144,19 @@ export function DailyAttendanceList() {
       ),
     },
     {
-      key: "clockIn",
+      key: "clockInTime",
       label: "出勤",
       headerClassName: "w-[80px]",
       render: (row) => (
-        <span className="font-mono text-sm">{formatTime(row.clockIn)}</span>
+        <span className="font-mono text-sm">{formatTime(row.clockInTime)}</span>
       ),
     },
     {
-      key: "clockOut",
+      key: "clockOutTime",
       label: "退勤",
       headerClassName: "w-[80px]",
       render: (row) => (
-        <span className="font-mono text-sm">{formatTime(row.clockOut)}</span>
+        <span className="font-mono text-sm">{formatTime(row.clockOutTime)}</span>
       ),
     },
     {
@@ -181,14 +181,14 @@ export function DailyAttendanceList() {
       ),
     },
     {
-      key: "overtimeMinutes",
+      key: "totalOvertimeMinutes",
       label: "残業",
       sortable: true,
       headerClassName: "w-[80px] hidden md:table-cell",
       cellClassName: "hidden md:table-cell",
       render: (row) => (
         <span className="font-mono text-sm">
-          {formatMinutes(row.overtimeMinutes)}
+          {formatMinutes(row.totalOvertimeMinutes)}
         </span>
       ),
     },

@@ -32,7 +32,7 @@ import java.util.UUID;
  */
 public record AssignScheduleRequest(
         @NotNull(message = "従業員IDは必須です")
-        UUID employeeId,
+        String employeeId,
 
         @NotNull(message = "週開始日は必須です")
         LocalDate weekStartDate,

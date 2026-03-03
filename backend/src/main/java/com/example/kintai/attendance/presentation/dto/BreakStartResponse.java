@@ -17,7 +17,7 @@ import java.util.UUID;
  */
 public record BreakStartResponse(
         UUID attendanceId,
-        UUID employeeId,
+        String employeeId,
         LocalDate workDate,
         String status,
         boolean onBreak,

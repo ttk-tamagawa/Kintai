@@ -109,7 +109,7 @@ public class AttendanceInternalController {
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         CorrectClockResponse response = new CorrectClockResponse(
                 record.getId().value(),
-                UUID.fromString(record.getEmployeeId().value()),
+                record.getEmployeeId().value(),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 targetType.name(),
@@ -173,7 +173,7 @@ public class AttendanceInternalController {
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         RegisterManualAttendanceResponse response = new RegisterManualAttendanceResponse(
                 record.getId().value(),
-                UUID.fromString(record.getEmployeeId().value()),
+                record.getEmployeeId().value(),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 startTime.value(),
@@ -222,7 +222,7 @@ public class AttendanceInternalController {
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         FinalizeResponse response = new FinalizeResponse(
                 record.getId().value(),
-                UUID.fromString(record.getEmployeeId().value()),
+                record.getEmployeeId().value(),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 request.monthlyClosingId(),

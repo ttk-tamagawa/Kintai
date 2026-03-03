@@ -116,7 +116,7 @@ public class AttendanceCommandController {
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         ClockInResponse response = new ClockInResponse(
                 record.getId().value(),
-                UUID.fromString(record.getEmployeeId().value()),
+                record.getEmployeeId().value(),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 clockInTime,
@@ -170,7 +170,7 @@ public class AttendanceCommandController {
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         ClockOutResponse response = new ClockOutResponse(
                 updated.getId().value(),
-                UUID.fromString(updated.getEmployeeId().value()),
+                updated.getEmployeeId().value(),
                 updated.getWorkDate().value(),
                 updated.getStatus().name(),
                 clockInTime,
@@ -222,7 +222,7 @@ public class AttendanceCommandController {
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         BreakStartResponse response = new BreakStartResponse(
                 updated.getId().value(),
-                UUID.fromString(updated.getEmployeeId().value()),
+                updated.getEmployeeId().value(),
                 updated.getWorkDate().value(),
                 updated.getStatus().name(),
                 true,  // 休憩開始直後なので必ずtrue
@@ -273,7 +273,7 @@ public class AttendanceCommandController {
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         BreakEndResponse response = new BreakEndResponse(
                 updated.getId().value(),
-                UUID.fromString(updated.getEmployeeId().value()),
+                updated.getEmployeeId().value(),
                 updated.getWorkDate().value(),
                 updated.getStatus().name(),
                 false,  // 休憩終了直後なので必ずfalse

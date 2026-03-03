@@ -44,7 +44,7 @@ public interface ShiftQueryRepository {
      */
     record ScheduleSummary(
             UUID scheduleId,
-            UUID employeeId,
+            String employeeId,
             LocalDate weekStartDate,
             String status,
             UUID mondayPatternId, String mondayPatternName,
@@ -81,6 +81,11 @@ public interface ShiftQueryRepository {
      * 従業員と期間で週次スケジュール一覧を取得する
      */
     List<ScheduleSummary> findSchedules(EmployeeId employeeId, LocalDate from, LocalDate to);
+
+    /**
+     * 期間のみで全従業員の週次スケジュール一覧を取得する（カレンダー表示用）
+     */
+    List<ScheduleSummary> findAllSchedules(LocalDate from, LocalDate to);
 
     /**
      * スケジュールIDで概要を取得する

@@ -231,24 +231,25 @@ public class WeeklyScheduleController {
      * 週次スケジュール一覧を取得する
      *
      * <p>従業員ID・期間でフィルタできる。
-     * from/toが省略された場合は今週の月曜日〜4週先の日曜日がデフォルト。</p>
+     * employeeIdが省略された場合は全従業員のスケジュールを返す（管理職向け）。
+     * weekFrom/weekToが省略された場合は今週の月曜日〜4週先の日曜日がデフォルト。</p>
      *
-     * @param employeeId 従業員ID（必須）
-     * @param from       検索開始日（省略可。デフォルト: 今週の月曜日）
-     * @param to         検索終了日（省略可。デフォルト: 4週先の日曜日）
+     * @param employeeId 従業員ID（省略可。省略時は全従業員分を返却）
+     * @param weekFrom   検索開始日（省略可。デフォルト: 今週の月曜日）
+     * @param weekTo     検索終了日（省略可。デフォルト: 4週先の日曜日）
      * @return スケジュール一覧
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER') and @accessControl.canAccessEmployee(authentication, #employeeId)")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER')")
     public ResponseEntity<List<ScheduleResponse>> getSchedules(
-            @RequestParam UUID employeeId,
-            @RequestParam(required = false) LocalDate from,
-            @RequestParam(required = false) LocalDate to) {
+            @RequestParam(required = false) UUID employeeId,
+            @RequestParam(required = false) LocalDate weekFrom,
+            @RequestParam(required = false) LocalDate weekTo) {
 
-        log.debug("スケジュール一覧リクエスト受信: employeeId={}, from={}, to={}", employeeId, from, to);
+        log.debug("スケジュール一覧リクエスト受信: employeeId={}, weekFrom={}, weekTo={}", employeeId, weekFrom, weekTo);
 
-        // クエリサービスでスケジュール一覧を取得する（from/toはサービス側でデフォルト値を設定）
-        List<ScheduleSummary> schedules = queryService.getSchedules(employeeId, from, to);
+        // クエリサービスでスケジュール一覧を取得する（employeeId=nullの場合は全件、weekFrom/weekToはサービス側でデフォルト値を設定）
+        List<ScheduleSummary> schedules = queryService.getSchedules(employeeId, weekFrom, weekTo);
 
         // ScheduleSummary → ScheduleResponse に変換する
         List<ScheduleResponse> response = schedules.stream()

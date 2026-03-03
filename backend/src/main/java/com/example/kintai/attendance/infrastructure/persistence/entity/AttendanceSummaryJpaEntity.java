@@ -25,9 +25,9 @@ public class AttendanceSummaryJpaEntity {
     @Column(name = "attendance_id")
     private UUID attendanceId;
 
-    /** 従業員ID */
-    @Column(name = "employee_id", nullable = false)
-    private UUID employeeId;
+    /** 従業員ID（VARCHAR(36): employees テーブルに合わせた文字列型） */
+    @Column(name = "employee_id", nullable = false, length = 36)
+    private String employeeId;
 
     /** 勤務日 */
     @Column(name = "work_date", nullable = false)
@@ -118,7 +118,7 @@ public class AttendanceSummaryJpaEntity {
      * @param employeeId   従業員ID
      * @param workDate     勤務日
      */
-    public AttendanceSummaryJpaEntity(UUID attendanceId, UUID employeeId, LocalDate workDate) {
+    public AttendanceSummaryJpaEntity(UUID attendanceId, String employeeId, LocalDate workDate) {
         this.attendanceId = attendanceId;
         this.employeeId = employeeId;
         this.workDate = workDate;
@@ -142,7 +142,7 @@ public class AttendanceSummaryJpaEntity {
     // ゲッター
 
     public UUID getAttendanceId() { return attendanceId; }
-    public UUID getEmployeeId() { return employeeId; }
+    public String getEmployeeId() { return employeeId; }
     public LocalDate getWorkDate() { return workDate; }
     public String getStatus() { return status; }
     public Instant getClockInTime() { return clockInTime; }

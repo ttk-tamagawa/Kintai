@@ -27,9 +27,9 @@ public class WeeklyScheduleJpaEntity {
     @Column(name = "id")
     private UUID id;
 
-    /** 従業員ID */
-    @Column(name = "employee_id", nullable = false)
-    private UUID employeeId;
+    /** 従業員ID（VARCHAR(36): employees テーブルに合わせた文字列型） */
+    @Column(name = "employee_id", nullable = false, length = 36)
+    private String employeeId;
 
     /** 週の開始日（月曜日） */
     @Column(name = "week_start_date", nullable = false)
@@ -99,7 +99,7 @@ public class WeeklyScheduleJpaEntity {
      * 全フィールド指定コンストラクタ — リポジトリ実装から使用する
      */
     public WeeklyScheduleJpaEntity(
-            UUID id, UUID employeeId, LocalDate weekStartDate, String status,
+            UUID id, String employeeId, LocalDate weekStartDate, String status,
             UUID mondayPatternId, UUID tuesdayPatternId, UUID wednesdayPatternId,
             UUID thursdayPatternId, UUID fridayPatternId, UUID saturdayPatternId,
             UUID sundayPatternId, int version, Instant createdAt, Instant updatedAt,
@@ -126,7 +126,7 @@ public class WeeklyScheduleJpaEntity {
     // ゲッター
 
     public UUID getId() { return id; }
-    public UUID getEmployeeId() { return employeeId; }
+    public String getEmployeeId() { return employeeId; }
     public LocalDate getWeekStartDate() { return weekStartDate; }
     public String getStatus() { return status; }
     public UUID getMondayPatternId() { return mondayPatternId; }

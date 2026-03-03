@@ -48,6 +48,8 @@ export function ClockInModal({
   const [currentTime, setCurrentTime] = useState(new Date());
   // 本日の勤怠データ
   const [attendance, setAttendance] = useState<TodayAttendance | null>(null);
+  // 休憩中フラグ（バックエンドの today API には onBreak がないため、ローカルで追跡する）
+  const [localOnBreak, setLocalOnBreak] = useState(false);
   // データ読み込み中
   const [loading, setLoading] = useState(false);
   // 打刻処理中（二重送信防止）
@@ -66,16 +68,17 @@ export function ClockInModal({
   // モーダル表示時に本日の勤怠情報を取得する
   // ========================================
   const loadToday = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try {
-      const data = await fetchTodayAttendance();
+      const data = await fetchTodayAttendance(user.employeeId);
       setAttendance(data);
     } catch (err) {
       toast.apiError(err);
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [user, toast]);
 
   useEffect(() => {
     if (open) loadToday();
@@ -86,7 +89,8 @@ export function ClockInModal({
   // ========================================
   const displayStatus: DisplayStatus = (() => {
     if (!attendance) return "NOT_CLOCKED";
-    if (attendance.status === "CLOCKED_IN" && attendance.onBreak)
+    // 休憩中はローカル状態で判定する（today API に onBreak フィールドがないため）
+    if (attendance.status === "CLOCKED_IN" && localOnBreak)
       return "ON_BREAK";
     return attendance.status;
   })();
@@ -136,16 +140,16 @@ export function ClockInModal({
     );
 
   const handleBreakStart = () =>
-    handleAction(
-      () => breakStart(user!.employeeId, getNowISO()),
-      "休憩を開始しました"
-    );
+    handleAction(async () => {
+      await breakStart(user!.employeeId, getNowISO());
+      setLocalOnBreak(true);
+    }, "休憩を開始しました");
 
   const handleBreakEnd = () =>
-    handleAction(
-      () => breakEnd(user!.employeeId, getNowISO()),
-      "休憩を終了しました"
-    );
+    handleAction(async () => {
+      await breakEnd(user!.employeeId, getNowISO());
+      setLocalOnBreak(false);
+    }, "休憩を終了しました");
 
   // ========================================
   // 勤務時間のリアルタイム計算（出勤中のみ）
@@ -153,10 +157,10 @@ export function ClockInModal({
   const getElapsedWorkMinutes = (): number | null => {
     if (!attendance?.clockIn) return null;
     if (attendance.status === "CLOCKED_OUT" || attendance.status === "FINALIZED")
-      return attendance.netWorkMinutes;
+      return attendance.netWorkMinutes ?? 0;
     // 出勤中: 現在時刻 - 出勤時刻 - 休憩時間
-    const clockInTime = new Date(attendance.clockIn).getTime();
-    const elapsed = Math.floor((Date.now() - clockInTime) / 60000);
+    const clockInMs = new Date(attendance.clockIn).getTime();
+    const elapsed = Math.floor((Date.now() - clockInMs) / 60000);
     return Math.max(0, elapsed - (attendance.breakMinutes ?? 0));
   };
 

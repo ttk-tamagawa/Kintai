@@ -32,7 +32,7 @@ import java.util.UUID;
  */
 public record ScheduleResponse(
         UUID scheduleId,
-        UUID employeeId,
+        String employeeId,
         LocalDate weekStartDate,
         String status,
         Map<String, DayAssignment> assignments,
