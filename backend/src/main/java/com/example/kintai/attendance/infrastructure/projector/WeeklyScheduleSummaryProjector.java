@@ -70,10 +70,10 @@ public class WeeklyScheduleSummaryProjector {
         log.debug("ShiftAssignedEvent受信: scheduleId={}, status={}",
                 event.scheduleId().value(), event.status());
 
-        // 新規サマリーエンティティを作成する
+        // 新規サマリーエンティティを作成する（EmployeeId: String→UUID変換）
         WeeklyScheduleSummaryJpaEntity entity = new WeeklyScheduleSummaryJpaEntity(
                 event.scheduleId().value(),
-                event.employeeId().value(),
+                UUID.fromString(event.employeeId().value()),
                 event.weekStartDate(),
                 event.status().name()
         );

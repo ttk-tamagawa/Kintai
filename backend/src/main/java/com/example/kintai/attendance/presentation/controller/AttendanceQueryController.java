@@ -1,5 +1,20 @@
 package com.example.kintai.attendance.presentation.controller;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.kintai.attendance.application.query.AttendanceQueryService;
 import com.example.kintai.attendance.application.query.AttendanceQueryService.DepartmentDashboardKpi;
 import com.example.kintai.attendance.application.query.AttendanceQueryService.DepartmentDashboardResult;
@@ -22,21 +37,6 @@ import com.example.kintai.attendance.presentation.dto.MonthlySummaryResponse.Mon
 import com.example.kintai.attendance.presentation.dto.MonthlySummaryResponse.PagedEmployees;
 import com.example.kintai.attendance.presentation.dto.TodayAttendanceResponse;
 import com.example.kintai.shared.domain.model.EmployeeId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * 勤怠記録クエリコントローラー — 6つの読み取りAPIエンドポイントを提供する
@@ -86,7 +86,7 @@ public class AttendanceQueryController {
     @GetMapping("/today")
     @PreAuthorize("hasRole('EMPLOYEE') and @accessControl.canAccessEmployee(authentication, #employeeId)")
     public ResponseEntity<TodayAttendanceResponse> getTodayAttendance(
-            @RequestParam UUID employeeId) {
+            @RequestParam String employeeId) {
 
         log.debug("当日勤怠取得リクエスト受信: employeeId={}", employeeId);
 
@@ -128,7 +128,7 @@ public class AttendanceQueryController {
     @GetMapping("/daily")
     @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'HR') and @accessControl.canAccessEmployee(authentication, #employeeId)")
     public ResponseEntity<DailyAttendancePageResponse> getDailyAttendances(
-            @RequestParam UUID employeeId,
+            @RequestParam String employeeId,
             @RequestParam(required = false) LocalDate dateFrom,
             @RequestParam(required = false) LocalDate dateTo,
             @RequestParam(required = false) String status,

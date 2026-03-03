@@ -85,7 +85,8 @@ export interface DailyAttendanceParams {
   status?: string;
   page?: number;
   size?: number;
-  sort?: string;
+  sortField?: string;
+  sortDirection?: string;
 }
 
 /** 日次勤怠一覧を取得する */

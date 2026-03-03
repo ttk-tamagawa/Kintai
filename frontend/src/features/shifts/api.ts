@@ -22,12 +22,12 @@ export interface PatternListParams {
   sort?: string;
 }
 
-/** シフトパターン一覧を取得する */
+/** シフトパターン一覧を取得する（バックエンドは配列を直接返す） */
 export async function fetchPatterns(
   params: PatternListParams
-): Promise<ShiftPatternsResponse> {
-  const { data } = await api.get<ShiftPatternsResponse>("/shifts/patterns", {
-    params,
+): Promise<ShiftPattern[]> {
+  const { data } = await api.get<ShiftPattern[]>("/shifts/patterns", {
+    params: { activeOnly: params.isActive },
   });
   return data;
 }

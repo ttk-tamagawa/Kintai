@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 勤怠記録コマンドコントローラー — 4つの打刻APIエンドポイントを提供する
@@ -112,9 +113,10 @@ public class AttendanceCommandController {
         // 出勤時刻を打刻エントリから取得する
         Instant clockInTime = findLatestTimeOfType(record.getClockEntries(), ClockType.CLOCK_IN);
 
+        // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         ClockInResponse response = new ClockInResponse(
                 record.getId().value(),
-                record.getEmployeeId().value(),
+                UUID.fromString(record.getEmployeeId().value()),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 clockInTime,
@@ -165,9 +167,10 @@ public class AttendanceCommandController {
         Instant clockInTime = findLatestTimeOfType(updated.getClockEntries(), ClockType.CLOCK_IN);
         Instant clockOutTime = findLatestTimeOfType(updated.getClockEntries(), ClockType.CLOCK_OUT);
 
+        // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         ClockOutResponse response = new ClockOutResponse(
                 updated.getId().value(),
-                updated.getEmployeeId().value(),
+                UUID.fromString(updated.getEmployeeId().value()),
                 updated.getWorkDate().value(),
                 updated.getStatus().name(),
                 clockInTime,
@@ -216,9 +219,10 @@ public class AttendanceCommandController {
         // 保存後のレコードを再取得してレスポンスを組み立てる
         AttendanceRecord updated = findRecordOrThrow(record.getId());
 
+        // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         BreakStartResponse response = new BreakStartResponse(
                 updated.getId().value(),
-                updated.getEmployeeId().value(),
+                UUID.fromString(updated.getEmployeeId().value()),
                 updated.getWorkDate().value(),
                 updated.getStatus().name(),
                 true,  // 休憩開始直後なので必ずtrue
@@ -266,9 +270,10 @@ public class AttendanceCommandController {
         // 合計休憩時間を打刻エントリから計算する
         int totalBreakMinutes = calculateTotalBreakMinutes(updated.getClockEntries());
 
+        // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         BreakEndResponse response = new BreakEndResponse(
                 updated.getId().value(),
-                updated.getEmployeeId().value(),
+                UUID.fromString(updated.getEmployeeId().value()),
                 updated.getWorkDate().value(),
                 updated.getStatus().name(),
                 false,  // 休憩終了直後なので必ずfalse

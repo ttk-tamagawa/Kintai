@@ -21,6 +21,8 @@ import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import java.util.UUID;
+
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,9 +106,10 @@ public class AttendanceInternalController {
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
 
+        // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         CorrectClockResponse response = new CorrectClockResponse(
                 record.getId().value(),
-                record.getEmployeeId().value(),
+                UUID.fromString(record.getEmployeeId().value()),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 targetType.name(),
@@ -167,9 +170,10 @@ public class AttendanceInternalController {
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
 
+        // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         RegisterManualAttendanceResponse response = new RegisterManualAttendanceResponse(
                 record.getId().value(),
-                record.getEmployeeId().value(),
+                UUID.fromString(record.getEmployeeId().value()),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 startTime.value(),
@@ -215,9 +219,10 @@ public class AttendanceInternalController {
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
 
+        // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         FinalizeResponse response = new FinalizeResponse(
                 record.getId().value(),
-                record.getEmployeeId().value(),
+                UUID.fromString(record.getEmployeeId().value()),
                 record.getWorkDate().value(),
                 record.getStatus().name(),
                 request.monthlyClosingId(),

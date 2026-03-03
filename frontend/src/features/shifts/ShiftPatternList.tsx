@@ -29,7 +29,7 @@ import {
   type PatternListParams,
 } from "./api";
 import { ShiftPatternModal } from "./ShiftPatternModal";
-import type { ShiftPattern, PageInfo } from "@/types";
+import type { ShiftPattern } from "@/types";
 
 // ========================================
 // シフトパターン一覧（SCR-SHF-001）
@@ -49,19 +49,9 @@ export function ShiftPatternList() {
   // 検索条件
   const [activeFilter, setActiveFilter] = useState("ALL");
 
-  // テーブルデータ
+  // テーブルデータ（バックエンドはページネーションなしで全件返却する）
   const [data, setData] = useState<ShiftPattern[]>([]);
-  const [pageInfo, setPageInfo] = useState<PageInfo>({
-    number: 0,
-    size: 20,
-    totalElements: 0,
-    totalPages: 0,
-  });
   const [loading, setLoading] = useState(false);
-
-  // ソート（デフォルト: パターン名昇順）
-  const [sortKey, setSortKey] = useState("name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   // 登録モーダル表示状態
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -77,26 +67,22 @@ export function ShiftPatternList() {
   // データ取得
   // ========================================
   const loadData = useCallback(
-    async (page = 0) => {
+    async () => {
       setLoading(true);
       try {
         const params: PatternListParams = {
           isActive:
             activeFilter === "ALL" ? undefined : activeFilter === "true",
-          page,
-          size: 20,
-          sort: `${sortKey},${sortDir}`,
         };
         const result = await fetchPatterns(params);
-        setData(result.content);
-        setPageInfo(result.page);
+        setData(result);
       } catch (err) {
         toast.apiError(err);
       } finally {
         setLoading(false);
       }
     },
-    [activeFilter, sortKey, sortDir, toast]
+    [activeFilter, toast]
   );
 
   // 初回読み込み
@@ -107,14 +93,8 @@ export function ShiftPatternList() {
   // ========================================
   // ハンドラー
   // ========================================
-  const handleSearch = () => loadData(0);
+  const handleSearch = () => loadData();
   const handleClear = () => setActiveFilter("ALL");
-  const handlePageChange = (page: number) => loadData(page);
-
-  const handleSortChange = (key: string, direction: "asc" | "desc") => {
-    setSortKey(key);
-    setSortDir(direction);
-  };
 
   // 確認ダイアログを開く
   const openConfirm = (
@@ -138,7 +118,7 @@ export function ShiftPatternList() {
         toast.success(`「${confirmTarget.name}」を再有効化しました`);
       }
       setConfirmTarget(null);
-      loadData(pageInfo.number);
+      loadData();
     } catch (err) {
       toast.apiError(err);
     } finally {
@@ -149,7 +129,7 @@ export function ShiftPatternList() {
   // 登録完了後にリストを再取得する
   const handleCreated = () => {
     setCreateModalOpen(false);
-    loadData(0);
+    loadData();
   };
 
   // ========================================
@@ -280,7 +260,7 @@ export function ShiftPatternList() {
       {/* アクションバー: 件数 + 新規登録ボタン */}
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">
-          {pageInfo.totalElements} 件
+          {data.length} 件
         </span>
         <Button onClick={() => setCreateModalOpen(true)}>+ 新規登録</Button>
       </div>
@@ -293,10 +273,6 @@ export function ShiftPatternList() {
         loading={loading}
         emptyMessage="シフトパターンが登録されていません"
         pagination={{ pageSize: 20 }}
-        totalItems={pageInfo.totalElements}
-        currentPage={pageInfo.number}
-        onPageChange={handlePageChange}
-        onSortChange={handleSortChange}
       />
 
       {/* パターン登録モーダル */}

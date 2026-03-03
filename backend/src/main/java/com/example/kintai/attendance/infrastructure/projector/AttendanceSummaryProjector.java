@@ -64,10 +64,10 @@ public class AttendanceSummaryProjector {
     public void on(ClockedInEvent event) {
         log.debug("ClockedInEvent受信: attendanceId={}", event.attendanceRecordId().value());
 
-        // サマリーを取得または新規作成する
+        // サマリーを取得または新規作成する（EmployeeId: String→UUID変換）
         AttendanceSummaryJpaEntity entity = findOrCreate(
                 event.attendanceRecordId().value(),
-                event.employeeId().value(),
+                UUID.fromString(event.employeeId().value()),
                 event.workDate().value()
         );
 
@@ -240,10 +240,10 @@ public class AttendanceSummaryProjector {
         log.debug("ManualAttendanceRegisteredEvent受信: attendanceId={}",
                 event.attendanceRecordId().value());
 
-        // サマリーを取得または新規作成する
+        // サマリーを取得または新規作成する（EmployeeId: String→UUID変換）
         AttendanceSummaryJpaEntity entity = findOrCreate(
                 event.attendanceRecordId().value(),
-                event.employeeId().value(),
+                UUID.fromString(event.employeeId().value()),
                 event.workDate().value()
         );
 

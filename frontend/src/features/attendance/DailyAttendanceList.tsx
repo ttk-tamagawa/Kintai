@@ -75,16 +75,19 @@ export function DailyAttendanceList() {
   // ========================================
   const loadData = useCallback(
     async (page = 0) => {
+      // employeeIdが未設定の場合はAPI呼び出しをスキップする（未ログイン時）
+      if (!employeeId) return;
       setLoading(true);
       try {
         const params: DailyAttendanceParams = {
-          employeeId: employeeId || undefined,
+          employeeId,
           dateFrom,
           dateTo,
           status: status === "ALL" ? undefined : status,
           page,
           size: 20,
-          sort: `${sortKey},${sortDir}`,
+          sortField: sortKey,
+          sortDirection: sortDir,
         };
         const result = await fetchDailyAttendances(params);
         setData(result.content);
