@@ -289,15 +289,15 @@ class ValueObjectTest {
             void ofでUUIDからIDを生成できる() {
                 UUID uuid = UUID.randomUUID();
                 EmployeeId id = EmployeeId.of(uuid);
-                assertEquals(uuid, id.value());
+                assertEquals(uuid.toString(), id.value());
             }
 
             @Test
-            @DisplayName("value(): 保持しているUUIDを取得できる")
-            void valueでUUIDを取得できる() {
-                UUID uuid = UUID.randomUUID();
-                EmployeeId id = new EmployeeId(uuid);
-                assertEquals(uuid, id.value());
+            @DisplayName("value(): 保持している文字列を取得できる")
+            void valueで文字列を取得できる() {
+                String value = UUID.randomUUID().toString();
+                EmployeeId id = new EmployeeId(value);
+                assertEquals(value, id.value());
             }
 
             @Test

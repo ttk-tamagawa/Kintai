@@ -211,10 +211,7 @@ public class ShiftPattern {
         long totalMinutes;
 
         if (isOvernight) {
-            // 夜勤: 24時間 - 開始時刻 + 終了時刻
-            long minutesToMidnight = ChronoUnit.MINUTES.between(startTime, LocalTime.MIDNIGHT)
-                    + (startTime.equals(LocalTime.MIDNIGHT) ? 0 : 24 * 60 - ChronoUnit.MINUTES.between(LocalTime.MIDNIGHT, startTime));
-            // 簡潔に: 開始から翌日終了までの分数
+            // 夜勤: 開始から翌日終了までの分数
             totalMinutes = ChronoUnit.MINUTES.between(startTime, endTime);
             if (totalMinutes <= 0) {
                 totalMinutes += 24 * 60; // 日跨ぎ補正

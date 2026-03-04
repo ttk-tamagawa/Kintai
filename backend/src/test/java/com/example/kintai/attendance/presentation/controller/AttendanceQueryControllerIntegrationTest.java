@@ -127,7 +127,7 @@ class AttendanceQueryControllerIntegrationTest {
         @DisplayName("出勤打刻後、200 OKでCLOCKED_INステータスを返す")
         void returns200WithClockedInStatusAfterClockIn() throws InterruptedException {
             // テスト用の従業員IDを生成する
-            UUID employeeId = UUID.randomUUID();
+            String employeeId = UUID.randomUUID().toString();
 
             // 出勤打刻リクエストを組み立てる（現在時刻をJSTで指定）
             OffsetDateTime clockTime = OffsetDateTime.now(ZoneOffset.ofHours(9));

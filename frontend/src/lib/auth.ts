@@ -60,14 +60,18 @@ export function clearAllTokens(): void {
   removeRefreshToken();
 }
 
-/** JWTペイロードをデコードする（Base64デコード） */
+/** JWTペイロードをデコードする（Base64url → UTF-8デコード） */
 export function decodeTokenPayload(
   token: string
 ): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
-    const payload = atob(parts[1]);
+    // Base64url → 標準Base64 に変換してデコード
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    // atob は Latin-1 しか扱えないため、UTF-8 バイト列を TextDecoder で正しく変換する
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const payload = new TextDecoder().decode(bytes);
     return JSON.parse(payload);
   } catch {
     return null;

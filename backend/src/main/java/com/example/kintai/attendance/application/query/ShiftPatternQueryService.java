@@ -1,15 +1,15 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.PatternSummary;
+import java.util.List;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
+import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.PatternSummary;
 
 /**
  * シフトパターンクエリサービス — シフトパターンの2つの読み取りユースケースを統合するアプリケーションサービス

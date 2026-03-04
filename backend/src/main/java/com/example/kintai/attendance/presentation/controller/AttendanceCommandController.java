@@ -1,23 +1,10 @@
 package com.example.kintai.attendance.presentation.controller;
 
-import com.example.kintai.attendance.application.command.AttendanceCommandService;
-import com.example.kintai.attendance.domain.model.AttendanceRecord;
-import com.example.kintai.attendance.domain.model.ClockEntry;
-import com.example.kintai.attendance.domain.model.ClockSource;
-import com.example.kintai.attendance.domain.model.ClockTime;
-import com.example.kintai.attendance.domain.model.ClockType;
-import com.example.kintai.attendance.domain.model.WorkDate;
-import com.example.kintai.attendance.domain.service.WorkDurationCalculator;
-import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
-import com.example.kintai.attendance.presentation.dto.BreakEndResponse;
-import com.example.kintai.attendance.presentation.dto.BreakStartResponse;
-import com.example.kintai.attendance.presentation.dto.ClockActionRequest;
-import com.example.kintai.attendance.presentation.dto.ClockInResponse;
-import com.example.kintai.attendance.presentation.dto.ClockOutResponse;
-import com.example.kintai.shared.domain.model.AttendanceRecordId;
-import com.example.kintai.shared.domain.model.EmployeeId;
-import com.example.kintai.shared.domain.model.ShiftPatternId;
-import jakarta.validation.Valid;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -27,11 +14,25 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.List;
-import java.util.UUID;
+import com.example.kintai.attendance.application.command.AttendanceCommandService;
+import com.example.kintai.attendance.domain.model.AttendanceRecord;
+import com.example.kintai.attendance.domain.model.ClockEntry;
+import com.example.kintai.attendance.domain.model.ClockSource;
+import com.example.kintai.attendance.domain.model.ClockTime;
+import com.example.kintai.attendance.domain.model.ClockType;
+import com.example.kintai.attendance.domain.model.WorkDate;
+import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
+import com.example.kintai.attendance.domain.service.WorkDurationCalculator;
+import com.example.kintai.attendance.presentation.dto.BreakEndResponse;
+import com.example.kintai.attendance.presentation.dto.BreakStartResponse;
+import com.example.kintai.attendance.presentation.dto.ClockActionRequest;
+import com.example.kintai.attendance.presentation.dto.ClockInResponse;
+import com.example.kintai.attendance.presentation.dto.ClockOutResponse;
+import com.example.kintai.shared.domain.model.AttendanceRecordId;
+import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.domain.model.ShiftPatternId;
+
+import jakarta.validation.Valid;
 
 /**
  * 勤怠記録コマンドコントローラー — 4つの打刻APIエンドポイントを提供する

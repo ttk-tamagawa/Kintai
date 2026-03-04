@@ -92,3 +92,6 @@ CREATE UNIQUE INDEX idx_dept_att_stats_pk
     ON department_attendance_stats (department_id, year, month);
 CREATE INDEX idx_dept_att_stats_overtime
     ON department_attendance_stats (avg_overtime_minutes DESC);
+
+-- 9. マテリアライズドビューを初回ポピュレートする（WITH NO DATA で作成したため）
+REFRESH MATERIALIZED VIEW department_attendance_stats;

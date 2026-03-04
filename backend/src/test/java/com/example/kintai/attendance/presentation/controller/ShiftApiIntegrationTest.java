@@ -78,8 +78,8 @@ class ShiftApiIntegrationTest {
     // スケジュールAPIのベースURL
     private static final String SCHEDULES_URL = "/api/v1/shifts/schedules";
 
-    // テスト用の従業員ID（weekly_schedulesにはemployeesテーブルへのFK制約がないためランダムUUIDを使用）
-    private static final UUID TEST_EMPLOYEE_ID = UUID.randomUUID();
+    // テスト用の従業員ID（weekly_schedulesにはemployeesテーブルへのFK制約がないためランダム文字列を使用）
+    private static final String TEST_EMPLOYEE_ID = UUID.randomUUID().toString();
 
     // テスト用の週開始日（月曜日であること）
     private static final LocalDate WEEK_START_DATE = LocalDate.of(2026, 3, 2);
