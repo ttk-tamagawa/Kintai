@@ -119,10 +119,22 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
-    @apply bg-background text-foreground;
   }
+}
+
+/* ボタン・リンク系要素のカーソルをポインターにする */
+/* Tailwind v4 プリフライト（cursor: default）より優先させるためレイヤー外に配置 */
+button,
+a,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+[role="combobox"],
+select,
+summary {
+  cursor: pointer;
 }

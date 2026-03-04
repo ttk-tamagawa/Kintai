@@ -78,11 +78,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Mobile用: スライドインのSheet */}
       <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent side="left" className="w-60 p-0">
+        <SheetContent side="left" className="w-60 p-0" showCloseButton={false}>
           <div className="flex h-14 items-center justify-between border-b px-4">
             <span className="text-sm font-semibold text-muted-foreground">
               メニュー
             </span>
+            {/* ヘッダー内に配置して上下中央揃え */}
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>

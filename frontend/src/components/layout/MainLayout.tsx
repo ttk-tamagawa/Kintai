@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useSyncExternalStore, useState, type ReactNode } from "react";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 
@@ -22,8 +22,12 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   // SSR時はRadixコンポーネント（DropdownMenu, Sheet等）を描画しない
   // Radix内部のuseIdがSSR/クライアント間でIDずれを起こすため
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // useSyncExternalStoreで同期的にクライアント判定し、不要な再レンダーを防ぐ
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   // SSR時・初回ハイドレーション時はスケルトンレイアウトを表示する
   if (!mounted) {
