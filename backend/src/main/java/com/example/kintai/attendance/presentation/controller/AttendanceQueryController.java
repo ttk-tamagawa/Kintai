@@ -55,7 +55,7 @@ import com.example.kintai.shared.domain.model.EmployeeId;
  * <p>全エンドポイントはRead Model（CQRSの読み取り側）を参照する。
  * Write Model（集約）へのアクセスは行わない。</p>
  *
- * <p>認可: today→EMPLOYEE, daily→EMPLOYEE/MANAGER/HR, monthly-summary→MANAGER/HR, department-dashboard→MANAGER/HR</p>
+ * <p>認可: today→EMPLOYEE, daily→EMPLOYEE/MANAGER/HR, monthly-summary→MANAGER/HR, department-dashboard→HR/ADMIN</p>
  */
 @RestController
 @RequestMapping("/api/v1/attendances")
@@ -260,7 +260,7 @@ public class AttendanceQueryController {
      * @return KPI + 前月KPI + 部門別テーブルのダッシュボード
      */
     @GetMapping("/department-dashboard")
-    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
     public ResponseEntity<DepartmentDashboardResponse> getDepartmentDashboard(
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) Integer year,
@@ -304,7 +304,7 @@ public class AttendanceQueryController {
      * @return CSVファイル（UTF-8 BOM付き）
      */
     @GetMapping("/department-dashboard/export")
-    @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
+    @PreAuthorize("hasAnyRole('HR', 'ADMIN')")
     public ResponseEntity<byte[]> exportDepartmentDashboard(
             @RequestParam(required = false) String departmentId,
             @RequestParam(required = false) Integer year,
@@ -341,6 +341,7 @@ public class AttendanceQueryController {
                 result.employeeId(),
                 result.workDate(),
                 result.status(),
+                result.onBreak(),
                 result.clockIn(),
                 result.clockOut(),
                 result.breakMinutes(),

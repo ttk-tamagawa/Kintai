@@ -30,7 +30,7 @@ const TABS: TabDef[] = [
   {
     id: "department",
     label: "部門ダッシュボード",
-    roles: ["MANAGER", "HR", "ADMIN"],
+    roles: ["HR", "ADMIN"],
   },
 ];
 

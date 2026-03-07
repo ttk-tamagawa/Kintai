@@ -14,6 +14,7 @@ import java.util.UUID;
  * @param employeeId         従業員ID
  * @param workDate           勤務日（YYYY-MM-DD）
  * @param status             勤怠ステータス（NOT_CLOCKED / CLOCKED_IN / CLOCKED_OUT / FINALIZED）
+ * @param onBreak            休憩中フラグ（CLOCKED_IN かつ未終了の休憩がある場合true）
  * @param clockIn            出勤時刻（UTC Instant）
  * @param clockOut           退勤時刻（UTC Instant、未退勤の場合はnull）
  * @param breakMinutes       合計休憩時間（分）
@@ -26,6 +27,7 @@ public record TodayAttendanceResponse(
         String employeeId,
         LocalDate workDate,
         String status,
+        boolean onBreak,
         Instant clockIn,
         Instant clockOut,
         int breakMinutes,

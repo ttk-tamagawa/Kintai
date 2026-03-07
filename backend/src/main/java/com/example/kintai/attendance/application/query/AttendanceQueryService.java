@@ -1,5 +1,8 @@
 package com.example.kintai.attendance.application.query;
 
+import com.example.kintai.attendance.domain.model.AttendanceRecord;
+import com.example.kintai.attendance.domain.model.WorkDate;
+import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
 import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
 import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DailySummary;
 import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DepartmentStats;
@@ -52,8 +55,13 @@ public class AttendanceQueryService {
     /** Read Modelクエリリポジトリ */
     private final AttendanceSummaryQueryRepository queryRepository;
 
-    public AttendanceQueryService(AttendanceSummaryQueryRepository queryRepository) {
+    /** Write Modelリポジトリ（休憩中フラグの判定に使用） */
+    private final AttendanceRecordRepository attendanceRecordRepository;
+
+    public AttendanceQueryService(AttendanceSummaryQueryRepository queryRepository,
+                                  AttendanceRecordRepository attendanceRecordRepository) {
         this.queryRepository = queryRepository;
+        this.attendanceRecordRepository = attendanceRecordRepository;
     }
 
     // ========================
@@ -68,6 +76,7 @@ public class AttendanceQueryService {
             String employeeId,
             LocalDate workDate,
             String status,
+            boolean onBreak,
             Instant clockIn,
             Instant clockOut,
             int breakMinutes,
@@ -170,11 +179,19 @@ public class AttendanceQueryService {
 
         // DailySummary → TodayAttendanceResult に変換する
         DailySummary s = summaries.getFirst();
+
+        // 書き込みモデルから休憩中フラグを取得する（打刻エントリの BREAK_START/END 数で判定）
+        boolean onBreak = attendanceRecordRepository
+                .findByEmployeeIdAndWorkDate(employeeId, new WorkDate(today))
+                .map(AttendanceRecord::isOnBreak)
+                .orElse(false);
+
         return Optional.of(new TodayAttendanceResult(
                 s.attendanceId(),
                 s.employeeId(),
                 s.workDate(),
                 s.status(),
+                onBreak,
                 s.clockInTime(),
                 s.clockOutTime(),
                 s.breakMinutes(),

@@ -96,6 +96,7 @@ export interface TodayAttendance {
   employeeId: string;
   workDate: string;
   status: AttendanceStatus;
+  onBreak: boolean;
   clockIn: string | null;
   clockOut: string | null;
   breakMinutes: number;

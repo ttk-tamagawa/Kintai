@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/useToast";
 import {
   fetchDepartmentDashboard,
@@ -28,17 +27,11 @@ import type {
 // ========================================
 
 export function DepartmentDashboard() {
-  const { user, hasAnyRole } = useAuth();
   const toast = useToast();
 
-  // HR/ADMIN は全部署を閲覧可能、MANAGER は自部署のみ
-  const isHR = hasAnyRole(["HR", "ADMIN"]);
-
-  // フィルター条件
+  // フィルター条件（HR/ADMINのみアクセスするため全部署検索がデフォルト）
   const [month, setMonth] = useState(getCurrentMonth());
-  const [departmentId, setDepartmentId] = useState(
-    isHR ? "" : (user?.departmentId ?? "")
-  );
+  const [departmentId, setDepartmentId] = useState("");
 
   // KPIデータ（当月+前月）
   const [kpi, setKpi] = useState<DepartmentDashboardKpi | null>(null);
@@ -223,26 +216,16 @@ export function DepartmentDashboard() {
               className="w-[180px]"
             />
           </div>
-          {/* HR/ADMIN: 部署IDフィルタで絞り込み可能 */}
-          {isHR ? (
-            <div className="space-y-1">
-              <Label className="text-xs">部署ID</Label>
-              <Input
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                placeholder="空欄で全部署"
-                className="w-[200px]"
-              />
-            </div>
-          ) : (
-            /* MANAGER: 自部署名を表示（変更不可） */
-            <div className="space-y-1">
-              <Label className="text-xs">部署</Label>
-              <p className="flex h-9 items-center text-sm text-muted-foreground">
-                {user?.departmentName ?? "---"}
-              </p>
-            </div>
-          )}
+          {/* 部署IDフィルタで絞り込み可能（HR/ADMINのみアクセス） */}
+          <div className="space-y-1">
+            <Label className="text-xs">部署ID</Label>
+            <Input
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              placeholder="空欄で全部署"
+              className="w-[200px]"
+            />
+          </div>
         </div>
         <Button variant="outline" onClick={handleExport} disabled={exporting}>
           {exporting ? (

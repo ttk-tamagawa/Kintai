@@ -73,6 +73,8 @@ export function ClockInModal({
     try {
       const data = await fetchTodayAttendance(user.employeeId);
       setAttendance(data);
+      // APIから休憩中フラグを復元する（モーダル再表示時のリセット防止）
+      setLocalOnBreak(data?.onBreak ?? false);
     } catch (err) {
       toast.apiError(err);
     } finally {

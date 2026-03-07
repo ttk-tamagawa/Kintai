@@ -15,7 +15,7 @@ import { setRefreshToken } from "@/lib/auth";
 const DEV_ACCOUNTS = [
   { email: "yamada@example.com", name: "山田 太郎", roles: "EMPLOYEE, MANAGER, ADMIN" },
   { email: "suzuki@example.com", name: "鈴木 花子", roles: "EMPLOYEE" },
-  { email: "tanaka@example.com", name: "田中 一郎", roles: "EMPLOYEE" },
+  { email: "tanaka@example.com", name: "田中 一郎", roles: "EMPLOYEE, MANAGER" },
   { email: "sato@example.com", name: "佐藤 美咲", roles: "EMPLOYEE" },
   { email: "takahashi@example.com", name: "高橋 健二", roles: "EMPLOYEE, HR" },
 ] as const;
