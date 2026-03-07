@@ -18,10 +18,10 @@ public interface JpaAttendanceRepository extends JpaRepository<AttendanceJpaEnti
     /**
      * 従業員IDと勤務日で検索する
      */
-    Optional<AttendanceJpaEntity> findByEmployeeIdAndWorkDate(UUID employeeId, LocalDate workDate);
+    Optional<AttendanceJpaEntity> findByEmployeeIdAndWorkDate(String employeeId, LocalDate workDate);
 
     /**
      * 従業員IDと勤務日の組み合わせが存在するか確認する
      */
-    boolean existsByEmployeeIdAndWorkDate(UUID employeeId, LocalDate workDate);
+    boolean existsByEmployeeIdAndWorkDate(String employeeId, LocalDate workDate);
 }

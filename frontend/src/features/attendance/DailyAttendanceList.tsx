@@ -53,6 +53,13 @@ export function DailyAttendanceList() {
   const [dateTo, setDateTo] = useState(getMonthEnd());
   const [status, setStatus] = useState<string>("ALL");
 
+  // 認証復元後にemployeeIdを同期する（useStateの初期値はuser未復元時に空文字になるため）
+  useEffect(() => {
+    if (user?.employeeId) {
+      setEmployeeId(user.employeeId);
+    }
+  }, [user?.employeeId]);
+
   // テーブルデータ
   const [data, setData] = useState<DailyAttendanceItem[]>([]);
   const [pageInfo, setPageInfo] = useState<PageInfo>({

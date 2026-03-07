@@ -67,9 +67,9 @@ public class AttendanceRecordRepositoryImpl implements AttendanceRecordRepositor
     @Override
     @Transactional(readOnly = true)
     public Optional<AttendanceRecord> findByEmployeeIdAndWorkDate(EmployeeId employeeId, WorkDate workDate) {
-        // 従業員ID + 勤務日のユニーク制約を利用して検索（String→UUID変換）
+        // 従業員ID + 勤務日のユニーク制約を利用して検索
         return jpaAttendanceRepo.findByEmployeeIdAndWorkDate(
-                UUID.fromString(employeeId.value()), workDate.value()
+                employeeId.value(), workDate.value()
         ).map(this::toDomainRecord);
     }
 
@@ -104,7 +104,7 @@ public class AttendanceRecordRepositoryImpl implements AttendanceRecordRepositor
     @Transactional(readOnly = true)
     public boolean existsByEmployeeIdAndWorkDate(EmployeeId employeeId, WorkDate workDate) {
         return jpaAttendanceRepo.existsByEmployeeIdAndWorkDate(
-                UUID.fromString(employeeId.value()), workDate.value()
+                employeeId.value(), workDate.value()
         );
     }
 

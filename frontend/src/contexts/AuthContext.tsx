@@ -8,6 +8,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import type { AuthUser, Role } from "@/types";
 import { getToken, clearAllTokens, setToken, decodeTokenPayload } from "@/lib/auth";
 
@@ -50,6 +51,7 @@ function buildUserFromToken(token: string): AuthUser | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const router = useRouter();
 
   // 初回マウント時にlocalStorageのトークンからユーザー情報を復元する
   useEffect(() => {
@@ -67,11 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
   }, []);
 
-  // ログアウト: アクセストークン・リフレッシュトークンを両方削除してユーザー情報をクリアする
+  // ログアウト: トークンを削除してログイン画面に遷移する
   const logout = useCallback(() => {
     clearAllTokens();
     setUser(null);
-  }, []);
+    router.push("/login");
+  }, [router]);
 
   // 指定ロールを持っているか確認する
   const hasRole = useCallback(

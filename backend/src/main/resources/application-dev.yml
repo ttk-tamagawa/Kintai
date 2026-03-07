@@ -19,3 +19,8 @@ app:
       - http://localhost:3000
   jwt:
     secret: dev-only-secret-key-that-is-at-least-256-bits-long-for-hs256-signing  # 開発環境専用
+
+# デバッグ用ログレベル設定
+logging:
+  level:
+    com.example.kintai: DEBUG
