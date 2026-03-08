@@ -109,21 +109,21 @@ public class ShiftPatternController {
     /**
      * シフトパターン一覧を取得する
      *
-     * <p>activeOnlyパラメータで有効パターンのみにフィルタできる。
+     * <p>isActiveパラメータで有効/無効をフィルタできる。
      * パターン数は少数（通常50件以下）のため、ページネーションは不要。</p>
      *
-     * @param activeOnly trueの場合、有効（ACTIVE）パターンのみ返却する（デフォルト: false）
+     * @param isActive true=有効のみ, false=無効のみ, 未指定=全件
      * @return パターン一覧（パターン名昇順）
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('MANAGER', 'HR')")
     public ResponseEntity<List<PatternResponse>> getPatterns(
-            @RequestParam(required = false, defaultValue = "false") boolean activeOnly) {
+            @RequestParam(required = false) Boolean isActive) {
 
-        log.debug("パターン一覧リクエスト受信: activeOnly={}", activeOnly);
+        log.debug("パターン一覧リクエスト受信: isActive={}", isActive);
 
         // クエリサービスでパターン一覧を取得する（名前昇順ソート済み）
-        List<PatternSummary> patterns = queryService.getPatterns(activeOnly);
+        List<PatternSummary> patterns = queryService.getPatterns(isActive);
 
         // PatternSummary → PatternResponse に変換する
         List<PatternResponse> response = patterns.stream()

@@ -56,15 +56,14 @@ public class ShiftPatternQueryService {
      * パターン数は少数（通常50件以下）のため、DBレベルでページネーションは不要。
      * API層で必要に応じてインメモリページネーションを適用する。</p>
      *
-     * @param activeOnly trueの場合、有効（ACTIVE）なパターンのみ取得する。
-     *                   falseの場合、全パターン（ACTIVE + INACTIVE）を取得する。
+     * @param isActive true=有効のみ, false=無効のみ, null=全件
      * @return パターン概要のリスト（パターン名昇順）
      */
-    public List<PatternSummary> getPatterns(boolean activeOnly) {
-        log.debug("シフトパターン一覧取得: activeOnly={}", activeOnly);
+    public List<PatternSummary> getPatterns(Boolean isActive) {
+        log.debug("シフトパターン一覧取得: isActive={}", isActive);
 
-        // ShiftQueryRepositoryから有効/全パターンを取得する（名前昇順ソート済み）
-        List<PatternSummary> patterns = shiftQueryRepository.findPatterns(activeOnly);
+        // ShiftQueryRepositoryからパターンを取得する（名前昇順ソート済み）
+        List<PatternSummary> patterns = shiftQueryRepository.findPatterns(isActive);
 
         log.debug("シフトパターン一覧取得完了: {}件", patterns.size());
         return patterns;

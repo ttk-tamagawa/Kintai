@@ -91,6 +91,20 @@ public class WeeklyScheduleCommandService {
     // ========================================
 
     /**
+     * コマンド実行結果 — Write Modelから直接レスポンスに必要な情報を保持する
+     *
+     * <p>AFTER_COMMITプロジェクターのタイミング問題を回避するため、
+     * Read Modelに依存せずWrite Modelからレスポンスを構築する。</p>
+     *
+     * @param schedule     保存済みの週次スケジュール（Write Model）
+     * @param patternNames パターンID→パターン名のマップ（レスポンス用）
+     */
+    public record AssignResult(
+            WeeklySchedule schedule,
+            Map<ShiftPatternId, String> patternNames
+    ) {}
+
+    /**
      * 新しい週次スケジュールを割り当てる
      *
      * <p>処理フロー:
@@ -107,11 +121,11 @@ public class WeeklyScheduleCommandService {
      * @param employeeId    従業員ID
      * @param weekStartDate 週の開始日（月曜日）
      * @param assignments   曜日ごとのシフトパターン割当（Map<DayOfWeek, ShiftPatternId>）
-     * @return 作成されたスケジュールID
+     * @return 割当結果（スケジュールとパターン名を含む）
      * @throws IllegalStateException    同一従業員・同一週にスケジュールが既に存在する場合
      * @throws IllegalArgumentException 割当パターンがINACTIVEの場合
      */
-    public ScheduleId assignSchedule(
+    public AssignResult assignSchedule(
             EmployeeId employeeId,
             LocalDate weekStartDate,
             Map<DayOfWeek, ShiftPatternId> assignments
@@ -125,8 +139,8 @@ public class WeeklyScheduleCommandService {
             );
         }
 
-        // 割当パターンが全てACTIVEであることを検証する（INV-SH-002）
-        validateAllPatternsActive(assignments);
+        // 割当パターンが全てACTIVEであることを検証し、パターン名を取得する（INV-SH-002）
+        Map<ShiftPatternId, String> patternNames = validateAndCollectPatternNames(assignments);
 
         // WeeklySchedule.assign()でドメインオブジェクトを作成する（DRAFT状態、月曜日チェック含む）
         WeeklySchedule schedule = WeeklySchedule.assign(employeeId, weekStartDate, assignments);
@@ -147,7 +161,7 @@ public class WeeklyScheduleCommandService {
         eventPublisher.publishEvent(event);
 
         log.debug("スケジュール割当完了: scheduleId={}", saved.getId().value());
-        return saved.getId();
+        return new AssignResult(saved, patternNames);
     }
 
     // ========================================
@@ -171,9 +185,10 @@ public class WeeklyScheduleCommandService {
      *
      * @param scheduleId     変更対象のスケジュールID
      * @param newAssignments 新しい曜日ごとの割当
+     * @return 変更結果（スケジュールとパターン名を含む）
      * @throws IllegalArgumentException スケジュールが見つからない場合、パターンがINACTIVEの場合
      */
-    public void changeSchedule(
+    public AssignResult changeSchedule(
             ScheduleId scheduleId,
             Map<DayOfWeek, ShiftPatternId> newAssignments
     ) {
@@ -182,8 +197,8 @@ public class WeeklyScheduleCommandService {
         // スケジュールをリポジトリから取得する（存在しなければ例外）
         WeeklySchedule schedule = findScheduleOrThrow(scheduleId);
 
-        // 新しい割当パターンが全てACTIVEであることを検証する（INV-SH-002）
-        validateAllPatternsActive(newAssignments);
+        // 新しい割当パターンが全てACTIVEであることを検証し、パターン名を取得する（INV-SH-002）
+        Map<ShiftPatternId, String> patternNames = validateAndCollectPatternNames(newAssignments);
 
         // 変更前のステータスを記録する（イベントに含めるため）
         ScheduleStatus previousStatus = schedule.getStatus();
@@ -208,6 +223,7 @@ public class WeeklyScheduleCommandService {
 
         log.debug("スケジュール変更完了: scheduleId={}, previousStatus={}, newStatus={}",
                 scheduleId.value(), previousStatus, schedule.getStatus());
+        return new AssignResult(schedule, patternNames);
     }
 
     // ========================================
@@ -230,10 +246,11 @@ public class WeeklyScheduleCommandService {
      * <p>公開されたスケジュールは従業員に通知される（通知機能は将来実装予定）。</p>
      *
      * @param scheduleId 公開対象のスケジュールID
+     * @return 公開後のスケジュール（Write Model）
      * @throws IllegalArgumentException スケジュールが見つからない場合
      * @throws IllegalStateException    既にPUBLISHEDの場合
      */
-    public void publishSchedule(ScheduleId scheduleId) {
+    public WeeklySchedule publishSchedule(ScheduleId scheduleId) {
         log.debug("スケジュール公開: scheduleId={}", scheduleId.value());
 
         // スケジュールをリポジトリから取得する（存在しなければ例外）
@@ -257,6 +274,7 @@ public class WeeklyScheduleCommandService {
         eventPublisher.publishEvent(event);
 
         log.debug("スケジュール公開完了: scheduleId={}", scheduleId.value());
+        return schedule;
     }
 
     // ========================================
@@ -277,10 +295,11 @@ public class WeeklyScheduleCommandService {
      * </p>
      *
      * @param scheduleId 非公開対象のスケジュールID
+     * @return 非公開後のスケジュール（Write Model）
      * @throws IllegalArgumentException スケジュールが見つからない場合
      * @throws IllegalStateException    PUBLISHEDでない場合
      */
-    public void unpublishSchedule(ScheduleId scheduleId) {
+    public WeeklySchedule unpublishSchedule(ScheduleId scheduleId) {
         log.debug("スケジュール非公開: scheduleId={}", scheduleId.value());
 
         // スケジュールをリポジトリから取得する（存在しなければ例外）
@@ -304,6 +323,7 @@ public class WeeklyScheduleCommandService {
         eventPublisher.publishEvent(event);
 
         log.debug("スケジュール非公開完了: scheduleId={}", scheduleId.value());
+        return schedule;
     }
 
     // ========================================
@@ -311,15 +331,20 @@ public class WeeklyScheduleCommandService {
     // ========================================
 
     /**
-     * 割当パターンが全てACTIVEであることを検証する
+     * 割当パターンが全てACTIVEであることを検証し、パターン名を収集する
      *
      * <p>INV-SH-002: 非アクティブなパターンは新規割当に使用不可。
-     * 全パターンをリポジトリから取得し、1つでもINACTIVEがあれば例外をスローする。</p>
+     * 全パターンをリポジトリから取得し、1つでもINACTIVEがあれば例外をスローする。
+     * レスポンス構築用にパターン名も収集して返す。</p>
      *
      * @param assignments 曜日ごとのパターン割当
+     * @return パターンID→パターン名のマップ
      * @throws IllegalArgumentException パターンが見つからない場合、INACTIVEの場合
      */
-    private void validateAllPatternsActive(Map<DayOfWeek, ShiftPatternId> assignments) {
+    private Map<ShiftPatternId, String> validateAndCollectPatternNames(
+            Map<DayOfWeek, ShiftPatternId> assignments) {
+        Map<ShiftPatternId, String> patternNames = new java.util.HashMap<>();
+
         for (Map.Entry<DayOfWeek, ShiftPatternId> entry : assignments.entrySet()) {
             ShiftPatternId patternId = entry.getValue();
 
@@ -337,7 +362,12 @@ public class WeeklyScheduleCommandService {
                                 + "（" + entry.getKey() + "の割当）"
                 );
             }
+
+            // パターン名を収集する（レスポンス構築用）
+            patternNames.put(patternId, pattern.getName().value());
         }
+
+        return patternNames;
     }
 
     /**

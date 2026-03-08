@@ -53,9 +53,9 @@ public class WeeklyScheduleRepositoryImpl implements WeeklyScheduleRepository {
     public Optional<WeeklySchedule> findByEmployeeIdAndWeekStartDate(
             EmployeeId employeeId, LocalDate weekStartDate
     ) {
-        // 従業員ID + 週開始日のユニーク制約を利用して検索（String→UUID変換）
+        // 従業員ID + 週開始日のユニーク制約を利用して検索
         return jpaWeeklyScheduleRepo.findByEmployeeIdAndWeekStartDate(
-                UUID.fromString(employeeId.value()), weekStartDate
+                employeeId.value(), weekStartDate
         ).map(this::toDomainModel);
     }
 
@@ -86,7 +86,7 @@ public class WeeklyScheduleRepositoryImpl implements WeeklyScheduleRepository {
             EmployeeId employeeId, LocalDate weekStartDate
     ) {
         return jpaWeeklyScheduleRepo.existsByEmployeeIdAndWeekStartDate(
-                UUID.fromString(employeeId.value()), weekStartDate
+                employeeId.value(), weekStartDate
         );
     }
 

@@ -23,12 +23,12 @@ public interface JpaWeeklyScheduleRepository extends JpaRepository<WeeklySchedul
      *
      * <p>1従業員1週1スケジュールのユニーク制約を利用した検索。</p>
      */
-    Optional<WeeklyScheduleJpaEntity> findByEmployeeIdAndWeekStartDate(UUID employeeId, LocalDate weekStartDate);
+    Optional<WeeklyScheduleJpaEntity> findByEmployeeIdAndWeekStartDate(String employeeId, LocalDate weekStartDate);
 
     /**
      * 従業員IDと週開始日の組み合わせが既に存在するか確認する
      */
-    boolean existsByEmployeeIdAndWeekStartDate(UUID employeeId, LocalDate weekStartDate);
+    boolean existsByEmployeeIdAndWeekStartDate(String employeeId, LocalDate weekStartDate);
 
     /**
      * 未来の週次スケジュールで指定パターンIDが使用されているか確認する

@@ -1,7 +1,9 @@
 package com.example.kintai.attendance.presentation.controller;
 
 import com.example.kintai.attendance.application.command.WeeklyScheduleCommandService;
+import com.example.kintai.attendance.application.command.WeeklyScheduleCommandService.AssignResult;
 import com.example.kintai.attendance.application.query.WeeklyScheduleQueryService;
+import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
 import com.example.kintai.attendance.presentation.dto.AssignScheduleRequest;
 import com.example.kintai.attendance.presentation.dto.ChangeScheduleRequest;
@@ -106,17 +108,16 @@ public class WeeklyScheduleController {
         Map<DayOfWeek, ShiftPatternId> assignments = parseAssignments(request.assignments());
 
         // コマンドサービスで割当を実行する（DRAFT状態で作成される）
-        ScheduleId scheduleId = commandService.assignSchedule(
+        AssignResult result = commandService.assignSchedule(
                 EmployeeId.of(request.employeeId()),
                 request.weekStartDate(),
                 assignments
         );
 
-        // 作成されたスケジュールをクエリサービスで再取得する（Read Modelはプロジェクターが更新済み）
-        ScheduleSummary summary = queryService.getSchedule(scheduleId.value());
-
-        log.debug("スケジュール割当完了: scheduleId={}", scheduleId.value());
-        return ResponseEntity.status(HttpStatus.CREATED).body(toScheduleResponse(summary));
+        // Write Modelから直接レスポンスを構築する（AFTER_COMMITプロジェクターのタイミング問題を回避）
+        log.debug("スケジュール割当完了: scheduleId={}", result.schedule().getId().value());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(toScheduleResponseFromWriteModel(result.schedule(), result.patternNames()));
     }
 
     // ========================================
@@ -150,13 +151,11 @@ public class WeeklyScheduleController {
         Map<DayOfWeek, ShiftPatternId> assignments = parseAssignments(request.assignments());
 
         // コマンドサービスで変更を実行する（PUBLISHEDの場合はDRAFTに戻る）
-        commandService.changeSchedule(ScheduleId.of(scheduleId), assignments);
+        AssignResult result = commandService.changeSchedule(ScheduleId.of(scheduleId), assignments);
 
-        // 更新後のスケジュールをクエリサービスで再取得する（Read Modelはプロジェクターが更新済み）
-        ScheduleSummary summary = queryService.getSchedule(scheduleId);
-
+        // Write Modelから直接レスポンスを構築する（AFTER_COMMITプロジェクターのタイミング問題を回避）
         log.debug("スケジュール変更完了: scheduleId={}", scheduleId);
-        return ResponseEntity.ok(toScheduleResponse(summary));
+        return ResponseEntity.ok(toScheduleResponseFromWriteModel(result.schedule(), result.patternNames()));
     }
 
     // ========================================
@@ -182,13 +181,11 @@ public class WeeklyScheduleController {
         log.debug("スケジュール公開リクエスト受信: scheduleId={}", scheduleId);
 
         // コマンドサービスで公開を実行する（DRAFT→PUBLISHED）
-        commandService.publishSchedule(ScheduleId.of(scheduleId));
+        WeeklySchedule schedule = commandService.publishSchedule(ScheduleId.of(scheduleId));
 
-        // 公開後のスケジュールをクエリサービスで再取得する（Read Modelのステータスが更新済み）
-        ScheduleSummary summary = queryService.getSchedule(scheduleId);
-
+        // Write Modelから直接レスポンスを構築する（パターン名なし — 公開はステータス変更のみ）
         log.debug("スケジュール公開完了: scheduleId={}", scheduleId);
-        return ResponseEntity.ok(toScheduleResponse(summary));
+        return ResponseEntity.ok(toScheduleResponseFromWriteModel(schedule, Map.of()));
     }
 
     // ========================================
@@ -214,13 +211,11 @@ public class WeeklyScheduleController {
         log.debug("スケジュール非公開リクエスト受信: scheduleId={}", scheduleId);
 
         // コマンドサービスで非公開を実行する（PUBLISHED→DRAFT）
-        commandService.unpublishSchedule(ScheduleId.of(scheduleId));
+        WeeklySchedule schedule = commandService.unpublishSchedule(ScheduleId.of(scheduleId));
 
-        // 非公開後のスケジュールをクエリサービスで再取得する（Read Modelのステータスが更新済み）
-        ScheduleSummary summary = queryService.getSchedule(scheduleId);
-
+        // Write Modelから直接レスポンスを構築する（パターン名なし — 非公開はステータス変更のみ）
         log.debug("スケジュール非公開完了: scheduleId={}", scheduleId);
-        return ResponseEntity.ok(toScheduleResponse(summary));
+        return ResponseEntity.ok(toScheduleResponseFromWriteModel(schedule, Map.of()));
     }
 
     // ========================================
@@ -348,6 +343,39 @@ public class WeeklyScheduleController {
                 summary.assignedDays(),
                 summary.createdAt(),
                 summary.updatedAt()
+        );
+    }
+
+    /**
+     * Write Model（WeeklySchedule）からScheduleResponseを直接構築する
+     *
+     * <p>AFTER_COMMITプロジェクターのタイミング問題を回避するため、
+     * コマンド実行後はRead Modelに依存せずWrite Modelからレスポンスを返す。</p>
+     *
+     * @param schedule     保存済みの週次スケジュール
+     * @param patternNames パターンID→パターン名のマップ
+     * @return APIレスポンスDTO
+     */
+    private ScheduleResponse toScheduleResponseFromWriteModel(
+            WeeklySchedule schedule, Map<ShiftPatternId, String> patternNames) {
+        // 曜日ごとの割当をネストされたMapに変換する（割当がある曜日のみ）
+        Map<String, DayAssignment> assignments = new LinkedHashMap<>();
+        for (Map.Entry<DayOfWeek, ShiftPatternId> entry : schedule.getAssignments().entrySet()) {
+            String dayName = entry.getKey().name();
+            UUID patternId = entry.getValue().value();
+            String patternName = patternNames.getOrDefault(entry.getValue(), "");
+            assignments.put(dayName, new DayAssignment(patternId, patternName));
+        }
+
+        return new ScheduleResponse(
+                schedule.getId().value(),
+                schedule.getEmployeeId().value(),
+                schedule.getWeekStartDate(),
+                schedule.getStatus().name(),
+                assignments,
+                schedule.getAssignments().size(),
+                schedule.getCreatedAt(),
+                schedule.getUpdatedAt()
         );
     }
 

@@ -22,7 +22,7 @@ export async function fetchPatterns(
   params: PatternListParams
 ): Promise<ShiftPattern[]> {
   const { data } = await api.get<ShiftPattern[]>("/shifts/patterns", {
-    params: { activeOnly: params.isActive },
+    params: { isActive: params.isActive },
   });
   return data;
 }
@@ -30,7 +30,7 @@ export async function fetchPatterns(
 /** 有効なシフトパターンのみ取得する（割当セレクト用。バックエンドは配列を直接返す） */
 export async function fetchActivePatterns(): Promise<ShiftPattern[]> {
   const { data } = await api.get<ShiftPattern[]>("/shifts/patterns", {
-    params: { activeOnly: true },
+    params: { isActive: true },
   });
   return data;
 }
