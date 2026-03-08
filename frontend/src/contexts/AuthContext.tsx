@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthUser, Role } from "@/types";
-import { getToken, clearAllTokens, setToken, decodeTokenPayload } from "@/lib/auth";
+import { getToken, clearAllTokens, setToken, decodeTokenPayload, isTokenExpired } from "@/lib/auth";
 
 // ========================================
 // 認証コンテキスト
@@ -54,13 +54,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   // 初回マウント時にlocalStorageのトークンからユーザー情報を復元する
+  // トークンが期限切れの場合はクリアしてログイン画面に遷移する
   useEffect(() => {
     const token = getToken();
     if (token) {
+      if (isTokenExpired(token)) {
+        // 期限切れトークンをクリアしてログイン画面へ遷移する
+        clearAllTokens();
+        router.push("/login");
+        return;
+      }
       const restoredUser = buildUserFromToken(token);
       setUser(restoredUser);
     }
-  }, []);
+  }, [router]);
 
   // ログイン: トークンを保存してユーザー情報をセットする
   const login = useCallback((token: string) => {
