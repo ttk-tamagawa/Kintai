@@ -67,8 +67,10 @@ public interface ShiftQueryRepository {
 
     /**
      * パターン一覧を取得する（有効/無効フィルタ対応）
+     *
+     * @param isActive true=有効のみ, false=無効のみ, null=全件
      */
-    List<PatternSummary> findPatterns(boolean activeOnly);
+    List<PatternSummary> findPatterns(Boolean isActive);
 
     /**
      * パターンIDで概要を取得する

@@ -41,12 +41,12 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
 
     @Override
     @SuppressWarnings("unchecked")
-    public List<PatternSummary> findPatterns(boolean activeOnly) {
-        // 有効パターンのみ or 全パターンを取得（論理削除を除外）
+    public List<PatternSummary> findPatterns(Boolean isActive) {
+        // isActive: true=有効のみ, false=無効のみ, null=全件（論理削除を除外）
         String jpql;
-        if (activeOnly) {
+        if (isActive != null) {
             jpql = "SELECT p FROM ShiftPatternJpaEntity p " +
-                    "WHERE p.isActive = true AND p.deletedAt IS NULL " +
+                    "WHERE p.isActive = :isActive AND p.deletedAt IS NULL " +
                     "ORDER BY p.name ASC";
         } else {
             jpql = "SELECT p FROM ShiftPatternJpaEntity p " +
@@ -54,7 +54,11 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
                     "ORDER BY p.name ASC";
         }
 
-        List<ShiftPatternJpaEntity> entities = entityManager.createQuery(jpql).getResultList();
+        var query = entityManager.createQuery(jpql);
+        if (isActive != null) {
+            query.setParameter("isActive", isActive);
+        }
+        List<ShiftPatternJpaEntity> entities = query.getResultList();
 
         // JPAエンティティ → PatternSummary DTOに変換
         List<PatternSummary> result = new ArrayList<>();
