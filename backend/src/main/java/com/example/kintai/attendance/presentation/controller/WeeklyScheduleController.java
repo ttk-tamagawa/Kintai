@@ -12,6 +12,8 @@ import com.example.kintai.attendance.presentation.dto.ScheduleResponse.DayAssign
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ScheduleId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.infrastructure.EmployeeAuthRepository;
+import com.example.kintai.shared.infrastructure.EmployeeJpaEntity;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,12 +72,17 @@ public class WeeklyScheduleController {
     /** 週次スケジュールクエリサービス — 読み取りユースケースの実行を委譲する */
     private final WeeklyScheduleQueryService queryService;
 
+    /** 従業員リポジトリ — コマンドレスポンスで従業員名を取得するために使用する */
+    private final EmployeeAuthRepository employeeRepository;
+
     public WeeklyScheduleController(
             WeeklyScheduleCommandService commandService,
-            WeeklyScheduleQueryService queryService
+            WeeklyScheduleQueryService queryService,
+            EmployeeAuthRepository employeeRepository
     ) {
         this.commandService = commandService;
         this.queryService = queryService;
+        this.employeeRepository = employeeRepository;
     }
 
     // ========================================
@@ -337,6 +344,7 @@ public class WeeklyScheduleController {
         return new ScheduleResponse(
                 summary.scheduleId(),
                 summary.employeeId(),
+                summary.employeeName(),
                 summary.weekStartDate(),
                 summary.status(),
                 assignments,
@@ -367,9 +375,15 @@ public class WeeklyScheduleController {
             assignments.put(dayName, new DayAssignment(patternId, patternName));
         }
 
+        // 従業員テーブルから従業員名を取得する
+        String employeeName = employeeRepository.findById(schedule.getEmployeeId().value())
+                .map(EmployeeJpaEntity::getName)
+                .orElse("");
+
         return new ScheduleResponse(
                 schedule.getId().value(),
                 schedule.getEmployeeId().value(),
+                employeeName,
                 schedule.getWeekStartDate(),
                 schedule.getStatus().name(),
                 assignments,

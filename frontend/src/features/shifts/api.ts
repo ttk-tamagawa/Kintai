@@ -75,6 +75,7 @@ export interface ScheduleListParams {
 interface BackendScheduleResponse {
   scheduleId: string;
   employeeId: string;
+  employeeName: string;
   weekStartDate: string;
   status: string;
   assignments: Record<string, { patternId: string; patternName: string }>;
@@ -116,8 +117,7 @@ function toScheduleItem(raw: BackendScheduleResponse): ScheduleItem {
   return {
     scheduleId: raw.scheduleId,
     employeeId: raw.employeeId,
-    // バックエンドに employeeName がないため空文字で代替
-    employeeName: "",
+    employeeName: raw.employeeName,
     weekStartDate: raw.weekStartDate,
     status: raw.status as ScheduleItem["status"],
     assignments,

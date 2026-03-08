@@ -23,6 +23,7 @@ import java.util.UUID;
  *
  * @param scheduleId    スケジュールID
  * @param employeeId    従業員ID
+ * @param employeeName  従業員名（employeesテーブルから取得）
  * @param weekStartDate 週の開始日（月曜日）
  * @param status        ステータス（DRAFT / PUBLISHED）
  * @param assignments   曜日ごとの割当（キー: MONDAY〜SUNDAY、値: DayAssignment）
@@ -33,6 +34,7 @@ import java.util.UUID;
 public record ScheduleResponse(
         UUID scheduleId,
         String employeeId,
+        String employeeName,
         LocalDate weekStartDate,
         String status,
         Map<String, DayAssignment> assignments,

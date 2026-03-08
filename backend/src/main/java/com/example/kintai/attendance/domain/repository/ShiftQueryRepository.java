@@ -40,11 +40,13 @@ public interface ShiftQueryRepository {
      * 週次スケジュール概要 — weekly_schedule_summariesテーブルの読み取り結果
      *
      * <p>各曜日のパターンIDとパターン名を保持する。
-     * パターン名はRead Modelに非正規化されているため、JOINなしで取得できる。</p>
+     * パターン名はRead Modelに非正規化されているため、JOINなしで取得できる。
+     * employeeNameはemployeesテーブルをJOINして取得する。</p>
      */
     record ScheduleSummary(
             UUID scheduleId,
             String employeeId,
+            String employeeName,
             LocalDate weekStartDate,
             String status,
             UUID mondayPatternId, String mondayPatternName,

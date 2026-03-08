@@ -78,9 +78,10 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
     @Override
     @SuppressWarnings("unchecked")
     public List<ScheduleSummary> findSchedules(EmployeeId employeeId, LocalDate from, LocalDate to) {
-        // 従業員IDと期間で週次スケジュールサマリーを取得（週開始日降順）
-        List<WeeklyScheduleSummaryJpaEntity> entities = entityManager.createQuery(
-                "SELECT s FROM WeeklyScheduleSummaryJpaEntity s " +
+        // 従業員IDと期間で週次スケジュールサマリーを取得し、employeesテーブルからemployeeNameを結合する
+        List<Object[]> rows = entityManager.createQuery(
+                "SELECT s, e.name FROM WeeklyScheduleSummaryJpaEntity s " +
+                "LEFT JOIN EmployeeJpaEntity e ON s.employeeId = e.employeeId " +
                 "WHERE s.employeeId = :employeeId " +
                 "AND s.weekStartDate BETWEEN :from AND :to " +
                 "AND s.deletedAt IS NULL " +
@@ -91,10 +92,10 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
                 .setParameter("to", to)
                 .getResultList();
 
-        // JPAエンティティ → ScheduleSummary DTOに変換
+        // JPAエンティティ + employeeName → ScheduleSummary DTOに変換
         List<ScheduleSummary> result = new ArrayList<>();
-        for (WeeklyScheduleSummaryJpaEntity e : entities) {
-            result.add(toScheduleSummary(e));
+        for (Object[] row : rows) {
+            result.add(toScheduleSummary((WeeklyScheduleSummaryJpaEntity) row[0], (String) row[1]));
         }
         return result;
     }
@@ -102,9 +103,10 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
     @Override
     @SuppressWarnings("unchecked")
     public List<ScheduleSummary> findAllSchedules(LocalDate from, LocalDate to) {
-        // 全従業員の週次スケジュールサマリーを期間で取得（週開始日昇順）
-        List<WeeklyScheduleSummaryJpaEntity> entities = entityManager.createQuery(
-                "SELECT s FROM WeeklyScheduleSummaryJpaEntity s " +
+        // 全従業員の週次スケジュールサマリーを期間で取得し、employeesテーブルからemployeeNameを結合する
+        List<Object[]> rows = entityManager.createQuery(
+                "SELECT s, e.name FROM WeeklyScheduleSummaryJpaEntity s " +
+                "LEFT JOIN EmployeeJpaEntity e ON s.employeeId = e.employeeId " +
                 "WHERE s.weekStartDate BETWEEN :from AND :to " +
                 "AND s.deletedAt IS NULL " +
                 "ORDER BY s.weekStartDate ASC, s.employeeId ASC"
@@ -113,21 +115,31 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
                 .setParameter("to", to)
                 .getResultList();
 
-        // JPAエンティティ → ScheduleSummary DTOに変換
+        // JPAエンティティ + employeeName → ScheduleSummary DTOに変換
         List<ScheduleSummary> result = new ArrayList<>();
-        for (WeeklyScheduleSummaryJpaEntity e : entities) {
-            result.add(toScheduleSummary(e));
+        for (Object[] row : rows) {
+            result.add(toScheduleSummary((WeeklyScheduleSummaryJpaEntity) row[0], (String) row[1]));
         }
         return result;
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Optional<ScheduleSummary> findScheduleById(UUID scheduleId) {
-        // weekly_schedule_summariesテーブルからIDで検索
-        WeeklyScheduleSummaryJpaEntity entity = entityManager.find(
-                WeeklyScheduleSummaryJpaEntity.class, scheduleId
-        );
-        return Optional.ofNullable(entity).map(this::toScheduleSummary);
+        // weekly_schedule_summariesテーブルからIDで検索し、employeesテーブルからemployeeNameを結合する
+        List<Object[]> rows = entityManager.createQuery(
+                "SELECT s, e.name FROM WeeklyScheduleSummaryJpaEntity s " +
+                "LEFT JOIN EmployeeJpaEntity e ON s.employeeId = e.employeeId " +
+                "WHERE s.weeklyScheduleId = :scheduleId AND s.deletedAt IS NULL"
+        )
+                .setParameter("scheduleId", scheduleId)
+                .getResultList();
+
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        Object[] row = rows.getFirst();
+        return Optional.of(toScheduleSummary((WeeklyScheduleSummaryJpaEntity) row[0], (String) row[1]));
     }
 
     // ========================
@@ -149,11 +161,12 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
         );
     }
 
-    /** JPAエンティティ → ScheduleSummary DTOに変換 */
-    private ScheduleSummary toScheduleSummary(WeeklyScheduleSummaryJpaEntity e) {
+    /** JPAエンティティ + employeeName → ScheduleSummary DTOに変換 */
+    private ScheduleSummary toScheduleSummary(WeeklyScheduleSummaryJpaEntity e, String employeeName) {
         return new ScheduleSummary(
                 e.getWeeklyScheduleId(),
                 e.getEmployeeId(),
+                employeeName != null ? employeeName : "",
                 e.getWeekStartDate(),
                 e.getStatus(),
                 e.getMondayPatternId(), e.getMondayPatternName(),
