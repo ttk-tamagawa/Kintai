@@ -1,0 +1,23 @@
+spring:
+  # テスト用PostgreSQLに接続（Docker Composeの別DB）
+  datasource:
+    url: jdbc:postgresql://localhost:5433/kintai_test
+    username: kintai
+    password: kintai
+    driver-class-name: org.postgresql.Driver
+
+  # テスト時はFlywayでテーブル作成後、Hibernateで検証
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+# CORS設定（テスト時は不要だが定義だけしておく）
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+  jwt:
+    secret: test-secret-key-that-is-at-least-256-bits-long-for-hs256-signing
+    expiration-ms: 3600000           # アクセストークン: 1時間
+    refresh-expiration-ms: 3600000   # リフレッシュトークン: 1時間
