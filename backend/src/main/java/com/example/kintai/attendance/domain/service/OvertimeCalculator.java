@@ -1,6 +1,7 @@
 package com.example.kintai.attendance.domain.service;
 
 import com.example.kintai.attendance.domain.model.OvertimeDuration;
+import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ import java.time.LocalDate;
  * </ul>
  * </p>
  */
+@Service
 public class OvertimeCalculator {
 
     /**

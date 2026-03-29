@@ -5,6 +5,7 @@ import com.example.kintai.attendance.domain.model.ClockEntry;
 import com.example.kintai.attendance.domain.model.ClockType;
 import com.example.kintai.attendance.domain.model.OvertimeDuration;
 import com.example.kintai.attendance.domain.model.WorkDuration;
+import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -30,6 +31,7 @@ import java.util.Objects;
  *
  * <p>計算精度: 分単位（秒以下は切り捨て）</p>
  */
+@Service
 public class WorkDurationCalculator {
 
     /** 固定時間制の所定労働時間: 480分（8時間） */

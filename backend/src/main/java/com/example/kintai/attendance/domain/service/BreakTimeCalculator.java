@@ -2,6 +2,7 @@ package com.example.kintai.attendance.domain.service;
 
 import com.example.kintai.attendance.domain.model.ClockEntry;
 import com.example.kintai.attendance.domain.model.ClockType;
+import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -18,6 +19,7 @@ import java.util.Objects;
  *
  * <p>計算精度: 分単位（秒以下は切り捨て）</p>
  */
+@Service
 public class BreakTimeCalculator {
 
     /**
