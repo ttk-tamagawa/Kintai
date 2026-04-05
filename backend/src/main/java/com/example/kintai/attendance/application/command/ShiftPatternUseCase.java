@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalTime;
 
 /**
- * シフトパターンコマンドサービス — シフトパターンの3つの書き込みユースケースを統合するアプリケーションサービス
+ * シフトパターンユースケース — シフトパターンの3つの書き込みユースケースを統合するアプリケーションサービス
  *
  * <p>各コマンドメソッドは以下の共通フローで処理する:
  * <ol>
@@ -40,9 +40,9 @@ import java.time.LocalTime;
  */
 @Service
 @Transactional
-public class ShiftPatternCommandService {
+public class ShiftPatternUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(ShiftPatternCommandService.class);
+    private static final Logger log = LoggerFactory.getLogger(ShiftPatternUseCase.class);
 
     /** シフトパターンリポジトリ — パターンのCRUD操作 */
     private final ShiftPatternRepository shiftPatternRepository;
@@ -56,7 +56,7 @@ public class ShiftPatternCommandService {
     /**
      * コンストラクタ — 3つの依存を注入する
      */
-    public ShiftPatternCommandService(
+    public ShiftPatternUseCase(
             ShiftPatternRepository shiftPatternRepository,
             WeeklyScheduleRepository weeklyScheduleRepository,
             ApplicationEventPublisher eventPublisher

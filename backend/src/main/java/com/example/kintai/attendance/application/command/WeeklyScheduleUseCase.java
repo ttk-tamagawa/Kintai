@@ -27,7 +27,7 @@ import java.time.LocalDate;
 import java.util.Map;
 
 /**
- * 週次スケジュールコマンドサービス — 週次スケジュールの3つの書き込みユースケースを統合するアプリケーションサービス
+ * 週次スケジュールユースケース — 週次スケジュールの3つの書き込みユースケースを統合するアプリケーションサービス
  *
  * <p>各コマンドメソッドは以下の共通フローで処理する:
  * <ol>
@@ -50,9 +50,9 @@ import java.util.Map;
  */
 @Service
 @Transactional
-public class WeeklyScheduleCommandService {
+public class WeeklyScheduleUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleCommandService.class);
+    private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleUseCase.class);
 
     /** 週次スケジュールリポジトリ — スケジュールのCRUD操作 */
     private final WeeklyScheduleRepository weeklyScheduleRepository;
@@ -72,7 +72,7 @@ public class WeeklyScheduleCommandService {
     /**
      * コンストラクタ — 5つの依存を注入する
      */
-    public WeeklyScheduleCommandService(
+    public WeeklyScheduleUseCase(
             WeeklyScheduleRepository weeklyScheduleRepository,
             ShiftPatternRepository shiftPatternRepository,
             WeeklyScheduleEventRepository weeklyScheduleEventRepository,

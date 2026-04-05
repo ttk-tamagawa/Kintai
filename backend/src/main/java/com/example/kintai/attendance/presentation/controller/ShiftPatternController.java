@@ -1,6 +1,6 @@
 package com.example.kintai.attendance.presentation.controller;
 
-import com.example.kintai.attendance.application.command.ShiftPatternCommandService;
+import com.example.kintai.attendance.application.command.ShiftPatternUseCase;
 import com.example.kintai.attendance.application.query.ShiftPatternQueryService;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.PatternSummary;
 import com.example.kintai.attendance.presentation.dto.DefinePatternRequest;
@@ -36,7 +36,7 @@ import java.util.UUID;
  * </ul>
  * </p>
  *
- * <p>コマンド系（作成・無効化・再有効化）はShiftPatternCommandServiceに委譲し、
+ * <p>コマンド系（作成・無効化・再有効化）はShiftPatternUseCaseに委譲し、
  * クエリ系（一覧・詳細）はShiftPatternQueryServiceに委譲する。
  * コマンド実行後のレスポンスはクエリサービスで最新状態を再取得して返却する。</p>
  *
@@ -48,14 +48,14 @@ public class ShiftPatternController {
 
     private static final Logger log = LoggerFactory.getLogger(ShiftPatternController.class);
 
-    /** シフトパターンコマンドサービス — 書き込みユースケースの実行を委譲する */
-    private final ShiftPatternCommandService commandService;
+    /** シフトパターンユースケース — 書き込みユースケースの実行を委譲する */
+    private final ShiftPatternUseCase commandService;
 
     /** シフトパターンクエリサービス — 読み取りユースケースの実行を委譲する */
     private final ShiftPatternQueryService queryService;
 
     public ShiftPatternController(
-            ShiftPatternCommandService commandService,
+            ShiftPatternUseCase commandService,
             ShiftPatternQueryService queryService
     ) {
         this.commandService = commandService;

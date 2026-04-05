@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.kintai.attendance.application.command.AttendanceCommandService;
+import com.example.kintai.attendance.application.command.AttendanceUseCase;
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
 import com.example.kintai.attendance.domain.model.ClockEntry;
 import com.example.kintai.attendance.domain.model.ClockSource;
@@ -50,7 +50,7 @@ import jakarta.validation.Valid;
  * <ol>
  *   <li>リクエストDTOをドメインオブジェクトに変換する</li>
  *   <li>退勤・休憩系は従業員ID+勤務日で既存レコードを検索する</li>
- *   <li>AttendanceCommandServiceのコマンドメソッドを呼び出す</li>
+ *   <li>AttendanceUseCaseのコマンドメソッドを呼び出す</li>
  *   <li>保存後のレコードを再取得してレスポンスDTOを組み立てる</li>
  * </ol>
  * </p>
@@ -66,14 +66,14 @@ public class AttendanceCommandController {
     /** タイムゾーン: Asia/Tokyo（打刻時刻から勤務日を算出するために使用） */
     private static final ZoneId ZONE_TOKYO = ZoneId.of("Asia/Tokyo");
 
-    /** 勤怠記録コマンドサービス — ドメインロジックの実行を委譲する */
-    private final AttendanceCommandService commandService;
+    /** 勤怠記録ユースケース — ドメインロジックの実行を委譲する */
+    private final AttendanceUseCase commandService;
 
     /** 勤怠記録リポジトリ — 従業員ID+勤務日でのレコード検索・レスポンス組み立て用 */
     private final AttendanceRecordRepository attendanceRecordRepository;
 
     public AttendanceCommandController(
-            AttendanceCommandService commandService,
+            AttendanceUseCase commandService,
             AttendanceRecordRepository attendanceRecordRepository) {
         this.commandService = commandService;
         this.attendanceRecordRepository = attendanceRecordRepository;

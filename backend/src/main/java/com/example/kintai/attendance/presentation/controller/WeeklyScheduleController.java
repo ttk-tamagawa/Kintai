@@ -1,7 +1,7 @@
 package com.example.kintai.attendance.presentation.controller;
 
-import com.example.kintai.attendance.application.command.WeeklyScheduleCommandService;
-import com.example.kintai.attendance.application.command.WeeklyScheduleCommandService.AssignResult;
+import com.example.kintai.attendance.application.command.WeeklyScheduleUseCase;
+import com.example.kintai.attendance.application.command.WeeklyScheduleUseCase.AssignResult;
 import com.example.kintai.attendance.application.query.WeeklyScheduleQueryService;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
@@ -51,7 +51,7 @@ import java.util.UUID;
  * </ul>
  * </p>
  *
- * <p>コマンド系（割当・変更・公開）はWeeklyScheduleCommandServiceに委譲し、
+ * <p>コマンド系（割当・変更・公開）はWeeklyScheduleUseCaseに委譲し、
  * クエリ系（一覧・詳細）はWeeklyScheduleQueryServiceに委譲する。
  * コマンド実行後のレスポンスはクエリサービスで最新のRead Modelを再取得して返却する。</p>
  *
@@ -66,8 +66,8 @@ public class WeeklyScheduleController {
 
     private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleController.class);
 
-    /** 週次スケジュールコマンドサービス — 書き込みユースケースの実行を委譲する */
-    private final WeeklyScheduleCommandService commandService;
+    /** 週次スケジュールユースケース — 書き込みユースケースの実行を委譲する */
+    private final WeeklyScheduleUseCase commandService;
 
     /** 週次スケジュールクエリサービス — 読み取りユースケースの実行を委譲する */
     private final WeeklyScheduleQueryService queryService;
@@ -76,7 +76,7 @@ public class WeeklyScheduleController {
     private final EmployeeAuthRepository employeeRepository;
 
     public WeeklyScheduleController(
-            WeeklyScheduleCommandService commandService,
+            WeeklyScheduleUseCase commandService,
             WeeklyScheduleQueryService queryService,
             EmployeeAuthRepository employeeRepository
     ) {

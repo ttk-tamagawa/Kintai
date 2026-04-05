@@ -25,7 +25,7 @@ import java.time.ZoneId;
 import java.util.List;
 
 /**
- * 勤怠記録コマンドサービス — 勤怠記録の7つの書き込みユースケースを統合するアプリケーションサービス
+ * 勤怠記録ユースケース — 勤怠記録の7つの書き込みユースケースを統合するアプリケーションサービス
  *
  * <p>各コマンドメソッドは以下の共通フローで処理する:
  * <ol>
@@ -54,9 +54,9 @@ import java.util.List;
  */
 @Service
 @Transactional
-public class AttendanceCommandService {
+public class AttendanceUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(AttendanceCommandService.class);
+    private static final Logger log = LoggerFactory.getLogger(AttendanceUseCase.class);
 
     /** タイムゾーン: Asia/Tokyo（打刻時刻から勤務日を算出するために使用） */
     private static final ZoneId ZONE_TOKYO = ZoneId.of("Asia/Tokyo");
@@ -82,7 +82,7 @@ public class AttendanceCommandService {
     /**
      * コンストラクタ — 6つの依存を注入する
      */
-    public AttendanceCommandService(
+    public AttendanceUseCase(
             AttendanceRecordRepository attendanceRecordRepository,
             AttendanceEventRepository attendanceEventRepository,
             ShiftPatternRepository shiftPatternRepository,

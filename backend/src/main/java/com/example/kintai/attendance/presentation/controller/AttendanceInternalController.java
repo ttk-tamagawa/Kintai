@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.kintai.attendance.application.command.AttendanceCommandService;
+import com.example.kintai.attendance.application.command.AttendanceUseCase;
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
 import com.example.kintai.attendance.domain.model.AttendanceStatus;
 import com.example.kintai.attendance.domain.model.AttendanceType;
@@ -56,14 +56,14 @@ public class AttendanceInternalController {
 
     private static final Logger log = LoggerFactory.getLogger(AttendanceInternalController.class);
 
-    /** 勤怠記録コマンドサービス — ドメインロジックの実行を委譲する */
-    private final AttendanceCommandService commandService;
+    /** 勤怠記録ユースケース — ドメインロジックの実行を委譲する */
+    private final AttendanceUseCase commandService;
 
     /** 勤怠記録リポジトリ — レスポンス組み立てのためのレコード再取得用 */
     private final AttendanceRecordRepository attendanceRecordRepository;
 
     public AttendanceInternalController(
-            AttendanceCommandService commandService,
+            AttendanceUseCase commandService,
             AttendanceRecordRepository attendanceRecordRepository) {
         this.commandService = commandService;
         this.attendanceRecordRepository = attendanceRecordRepository;
