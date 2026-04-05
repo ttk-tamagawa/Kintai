@@ -35,6 +35,7 @@ public class WeeklyScheduleEventRepositoryImpl implements WeeklyScheduleEventRep
 
     @Override
     public void append(
+            UUID eventId,
             ScheduleId scheduleId,
             String eventType,
             String payloadJson,
@@ -42,9 +43,9 @@ public class WeeklyScheduleEventRepositoryImpl implements WeeklyScheduleEventRep
     ) {
         Instant now = Instant.now();
 
-        // イベントエンティティを作成して weekly_schedule_events テーブルに INSERT
+        // イベントエンティティを作成して weekly_schedule_events テーブルに INSERT（IDにはドメインイベントのeventIdを使用）
         WeeklyScheduleEventJpaEntity entity = new WeeklyScheduleEventJpaEntity(
-                UUID.randomUUID(),
+                eventId,
                 scheduleId.value(),
                 eventType,
                 payloadJson,

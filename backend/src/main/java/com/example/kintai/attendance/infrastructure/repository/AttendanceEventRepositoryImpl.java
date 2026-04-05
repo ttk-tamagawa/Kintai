@@ -35,6 +35,7 @@ public class AttendanceEventRepositoryImpl implements AttendanceEventRepository 
 
     @Override
     public void append(
+            UUID eventId,
             AttendanceRecordId attendanceId,
             String eventType,
             String payloadJson,
@@ -42,9 +43,9 @@ public class AttendanceEventRepositoryImpl implements AttendanceEventRepository 
     ) {
         Instant now = Instant.now();
 
-        // イベントエンティティを作成してINSERT
+        // イベントエンティティを作成してINSERT（IDにはドメインイベントのeventIdを使用）
         AttendanceEventJpaEntity entity = new AttendanceEventJpaEntity(
-                UUID.randomUUID(),
+                eventId,
                 attendanceId.value(),
                 eventType,
                 payloadJson,

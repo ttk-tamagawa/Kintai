@@ -4,6 +4,7 @@ import com.example.kintai.attendance.domain.model.WorkDate;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.MonthlyClosingId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -18,43 +19,50 @@ import java.util.Objects;
  *   <li>給与計算システムへの連携トリガー（将来実装）</li>
  * </ul>
  * </p>
- *
- * @param attendanceRecordId 勤怠記録ID
- * @param employeeId         従業員ID
- * @param workDate           勤務日
- * @param monthlyClosingId   月次締めID（どの締め処理に基づく確定か）
- * @param occurredAt         イベント発生日時
  */
-public record AttendanceFinalizedEvent(
-        AttendanceRecordId attendanceRecordId,
-        EmployeeId employeeId,
-        WorkDate workDate,
-        MonthlyClosingId monthlyClosingId,
-        Instant occurredAt
-) {
+public class AttendanceFinalizedEvent extends DomainEvent {
+
+    /** 勤怠記録ID */
+    private final AttendanceRecordId attendanceRecordId;
+    /** 従業員ID */
+    private final EmployeeId employeeId;
+    /** 勤務日 */
+    private final WorkDate workDate;
+    /** 月次締めID（どの締め処理に基づく確定か） */
+    private final MonthlyClosingId monthlyClosingId;
 
     /**
-     * コンパクトコンストラクタ — 全フィールドのnullチェックを行う
+     * コンストラクタ — 固有フィールドのnullチェックを行い、基底クラスで eventId・occurredAt を自動設定する
      */
-    public AttendanceFinalizedEvent {
-        Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
-        Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
-        Objects.requireNonNull(workDate, "勤務日はnullにできません");
-        Objects.requireNonNull(monthlyClosingId, "月次締めIDはnullにできません");
-        Objects.requireNonNull(occurredAt, "イベント発生日時はnullにできません");
+    public AttendanceFinalizedEvent(
+            AttendanceRecordId attendanceRecordId,
+            EmployeeId employeeId,
+            WorkDate workDate,
+            MonthlyClosingId monthlyClosingId
+    ) {
+        super();
+        this.attendanceRecordId = Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
+        this.employeeId = Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
+        this.workDate = Objects.requireNonNull(workDate, "勤務日はnullにできません");
+        this.monthlyClosingId = Objects.requireNonNull(monthlyClosingId, "月次締めIDはnullにできません");
     }
+
+    @Override
+    public String getEventType() {
+        return "ATTENDANCE_FINALIZED";
+    }
+
+    public AttendanceRecordId attendanceRecordId() { return attendanceRecordId; }
+    public EmployeeId employeeId() { return employeeId; }
+    public WorkDate workDate() { return workDate; }
+    public MonthlyClosingId monthlyClosingId() { return monthlyClosingId; }
+    public Instant occurredAt() { return getOccurredAt(); }
 
     /**
      * イベントを生成するファクトリメソッド
      *
      * <p>AttendanceRecordのfinalizeRecord()成功後に呼び出される。
-     * 月次締めSagaからの内部呼び出しにより発行される。</p>
-     *
-     * @param attendanceRecordId 勤怠記録ID
-     * @param employeeId         従業員ID
-     * @param workDate           勤務日
-     * @param monthlyClosingId   月次締めID
-     * @return AttendanceFinalizedEventインスタンス
+     * eventId・occurredAt は基底クラスで自動設定される。</p>
      */
     public static AttendanceFinalizedEvent of(
             AttendanceRecordId attendanceRecordId,
@@ -62,12 +70,6 @@ public record AttendanceFinalizedEvent(
             WorkDate workDate,
             MonthlyClosingId monthlyClosingId
     ) {
-        return new AttendanceFinalizedEvent(
-                attendanceRecordId,
-                employeeId,
-                workDate,
-                monthlyClosingId,
-                Instant.now()
-        );
+        return new AttendanceFinalizedEvent(attendanceRecordId, employeeId, workDate, monthlyClosingId);
     }
 }

@@ -2,6 +2,7 @@ package com.example.kintai.attendance.domain.model.shift.event;
 
 import com.example.kintai.attendance.domain.model.shift.PatternName;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import java.time.Instant;
 import java.time.LocalTime;
@@ -16,47 +17,55 @@ import java.util.Objects;
  *   <li>管理者への作成完了通知</li>
  * </ul>
  * </p>
- *
- * @param patternId   シフトパターンID
- * @param name        パターン名（早番、遅番等）
- * @param startTime   勤務開始時刻
- * @param endTime     勤務終了時刻
- * @param isOvernight 夜勤フラグ（trueなら日跨ぎパターン）
- * @param occurredAt  イベント発生日時
  */
-public record ShiftPatternDefinedEvent(
-        ShiftPatternId patternId,
-        PatternName name,
-        LocalTime startTime,
-        LocalTime endTime,
-        boolean isOvernight,
-        Instant occurredAt
-) {
+public class ShiftPatternDefinedEvent extends DomainEvent {
+
+    /** シフトパターンID */
+    private final ShiftPatternId patternId;
+    /** パターン名（早番、遅番等） */
+    private final PatternName name;
+    /** 勤務開始時刻 */
+    private final LocalTime startTime;
+    /** 勤務終了時刻 */
+    private final LocalTime endTime;
+    /** 夜勤フラグ（trueなら日跨ぎパターン） */
+    private final boolean isOvernight;
 
     /**
-     * コンパクトコンストラクタ — 全フィールドのnullチェックを行う
+     * コンストラクタ — 固有フィールドのnullチェックを行い、基底クラスで eventId・occurredAt を自動設定する
      */
-    public ShiftPatternDefinedEvent {
-        Objects.requireNonNull(patternId, "シフトパターンIDはnullにできません");
-        Objects.requireNonNull(name, "パターン名はnullにできません");
-        Objects.requireNonNull(startTime, "勤務開始時刻はnullにできません");
-        Objects.requireNonNull(endTime, "勤務終了時刻はnullにできません");
-        // isOvernight はプリミティブ型のためnullチェック不要
-        Objects.requireNonNull(occurredAt, "イベント発生日時はnullにできません");
+    public ShiftPatternDefinedEvent(
+            ShiftPatternId patternId,
+            PatternName name,
+            LocalTime startTime,
+            LocalTime endTime,
+            boolean isOvernight
+    ) {
+        super();
+        this.patternId = Objects.requireNonNull(patternId, "シフトパターンIDはnullにできません");
+        this.name = Objects.requireNonNull(name, "パターン名はnullにできません");
+        this.startTime = Objects.requireNonNull(startTime, "勤務開始時刻はnullにできません");
+        this.endTime = Objects.requireNonNull(endTime, "勤務終了時刻はnullにできません");
+        this.isOvernight = isOvernight;
     }
+
+    @Override
+    public String getEventType() {
+        return "SHIFT_PATTERN_DEFINED";
+    }
+
+    public ShiftPatternId patternId() { return patternId; }
+    public PatternName name() { return name; }
+    public LocalTime startTime() { return startTime; }
+    public LocalTime endTime() { return endTime; }
+    public boolean isOvernight() { return isOvernight; }
+    public Instant occurredAt() { return getOccurredAt(); }
 
     /**
      * イベントを生成するファクトリメソッド
      *
      * <p>ShiftPatternのdefine()成功後に呼び出される。
-     * イベント発生日時は自動的に現在時刻が設定される。</p>
-     *
-     * @param patternId   シフトパターンID
-     * @param name        パターン名
-     * @param startTime   勤務開始時刻
-     * @param endTime     勤務終了時刻
-     * @param isOvernight 夜勤フラグ
-     * @return ShiftPatternDefinedEventインスタンス
+     * eventId・occurredAt は基底クラスで自動設定される。</p>
      */
     public static ShiftPatternDefinedEvent of(
             ShiftPatternId patternId,
@@ -65,13 +74,6 @@ public record ShiftPatternDefinedEvent(
             LocalTime endTime,
             boolean isOvernight
     ) {
-        return new ShiftPatternDefinedEvent(
-                patternId,
-                name,
-                startTime,
-                endTime,
-                isOvernight,
-                Instant.now()
-        );
+        return new ShiftPatternDefinedEvent(patternId, name, startTime, endTime, isOvernight);
     }
 }

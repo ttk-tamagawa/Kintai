@@ -4,6 +4,7 @@ import com.example.kintai.attendance.domain.model.ClockSource;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -17,43 +18,50 @@ import java.util.Objects;
  *   <li>Read Model（attendance_summaries）の退勤時刻を更新</li>
  * </ul>
  * </p>
- *
- * @param attendanceRecordId 勤怠記録ID
- * @param employeeId         従業員ID
- * @param clockTime          退勤打刻時刻
- * @param source             打刻元（WEB/MOBILE）
- * @param occurredAt         イベント発生日時
  */
-public record ClockedOutEvent(
-        AttendanceRecordId attendanceRecordId,
-        EmployeeId employeeId,
-        ClockTime clockTime,
-        ClockSource source,
-        Instant occurredAt
-) {
+public class ClockedOutEvent extends DomainEvent {
+
+    /** 勤怠記録ID */
+    private final AttendanceRecordId attendanceRecordId;
+    /** 従業員ID */
+    private final EmployeeId employeeId;
+    /** 退勤打刻時刻 */
+    private final ClockTime clockTime;
+    /** 打刻元（WEB/MOBILE） */
+    private final ClockSource source;
 
     /**
-     * コンパクトコンストラクタ — 全フィールドのnullチェックを行う
+     * コンストラクタ — 固有フィールドのnullチェックを行い、基底クラスで eventId・occurredAt を自動設定する
      */
-    public ClockedOutEvent {
-        Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
-        Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
-        Objects.requireNonNull(clockTime, "退勤打刻時刻はnullにできません");
-        Objects.requireNonNull(source, "打刻元はnullにできません");
-        Objects.requireNonNull(occurredAt, "イベント発生日時はnullにできません");
+    public ClockedOutEvent(
+            AttendanceRecordId attendanceRecordId,
+            EmployeeId employeeId,
+            ClockTime clockTime,
+            ClockSource source
+    ) {
+        super();
+        this.attendanceRecordId = Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
+        this.employeeId = Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
+        this.clockTime = Objects.requireNonNull(clockTime, "退勤打刻時刻はnullにできません");
+        this.source = Objects.requireNonNull(source, "打刻元はnullにできません");
     }
+
+    @Override
+    public String getEventType() {
+        return "CLOCKED_OUT";
+    }
+
+    public AttendanceRecordId attendanceRecordId() { return attendanceRecordId; }
+    public EmployeeId employeeId() { return employeeId; }
+    public ClockTime clockTime() { return clockTime; }
+    public ClockSource source() { return source; }
+    public Instant occurredAt() { return getOccurredAt(); }
 
     /**
      * イベントを生成するファクトリメソッド
      *
      * <p>AttendanceRecordのclockOut()成功後に呼び出される。
-     * このイベントをトリガーに勤務時間の自動計算が実行される。</p>
-     *
-     * @param attendanceRecordId 勤怠記録ID
-     * @param employeeId         従業員ID
-     * @param clockTime          退勤打刻時刻
-     * @param source             打刻元
-     * @return ClockedOutEventインスタンス
+     * eventId・occurredAt は基底クラスで自動設定される。</p>
      */
     public static ClockedOutEvent of(
             AttendanceRecordId attendanceRecordId,
@@ -61,12 +69,6 @@ public record ClockedOutEvent(
             ClockTime clockTime,
             ClockSource source
     ) {
-        return new ClockedOutEvent(
-                attendanceRecordId,
-                employeeId,
-                clockTime,
-                source,
-                Instant.now()
-        );
+        return new ClockedOutEvent(attendanceRecordId, employeeId, clockTime, source);
     }
 }

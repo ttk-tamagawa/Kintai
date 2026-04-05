@@ -11,6 +11,7 @@ import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -143,7 +143,7 @@ public class AttendanceUseCase {
         );
 
         // イベントストアに記録する
-        persistEvent(saved.getId(), "CLOCKED_IN", event, event.occurredAt());
+        persistEvent(saved.getId(), event);
 
         // イベントを発行する（プロジェクターがattendance_summariesを更新）
         eventPublisher.publishEvent(event);
@@ -193,7 +193,7 @@ public class AttendanceUseCase {
         ClockedOutEvent clockedOutEvent = ClockedOutEvent.of(
                 saved.getId(), record.getEmployeeId(), clockTime, source
         );
-        persistEvent(saved.getId(), "CLOCKED_OUT", clockedOutEvent, clockedOutEvent.occurredAt());
+        persistEvent(saved.getId(), clockedOutEvent);
         eventPublisher.publishEvent(clockedOutEvent);
 
         // WorkDurationCalculatedイベントを生成・保存・発行する
@@ -201,7 +201,7 @@ public class AttendanceUseCase {
                 saved.getId(), record.getEmployeeId(),
                 calcResult.workDuration(), calcResult.overtimeDuration()
         );
-        persistEvent(saved.getId(), "WORK_DURATION_CALCULATED", calcEvent, calcEvent.occurredAt());
+        persistEvent(saved.getId(), calcEvent);
         eventPublisher.publishEvent(calcEvent);
 
         log.debug("退勤打刻完了: attendanceId={}, netWorkMinutes={}",
@@ -245,7 +245,7 @@ public class AttendanceUseCase {
         BreakStartedEvent event = BreakStartedEvent.of(
                 saved.getId(), record.getEmployeeId(), clockTime
         );
-        persistEvent(saved.getId(), "BREAK_STARTED", event, event.occurredAt());
+        persistEvent(saved.getId(), event);
         eventPublisher.publishEvent(event);
 
         log.debug("休憩開始完了: attendanceId={}", saved.getId().value());
@@ -293,7 +293,7 @@ public class AttendanceUseCase {
         BreakEndedEvent event = BreakEndedEvent.of(
                 saved.getId(), record.getEmployeeId(), clockTime, breakMinutes
         );
-        persistEvent(saved.getId(), "BREAK_ENDED", event, event.occurredAt());
+        persistEvent(saved.getId(), event);
         eventPublisher.publishEvent(event);
 
         log.debug("休憩終了完了: attendanceId={}, breakMinutes={}", saved.getId().value(), breakMinutes);
@@ -345,7 +345,7 @@ public class AttendanceUseCase {
                 correction.targetType(), beforeTime, correction.correctedTime(),
                 correction.approvalId()
         );
-        persistEvent(saved.getId(), "CLOCK_CORRECTED", correctedEvent, correctedEvent.occurredAt());
+        persistEvent(saved.getId(), correctedEvent);
         eventPublisher.publishEvent(correctedEvent);
 
         // 退勤済みの場合は再計算イベントも発行する
@@ -354,7 +354,7 @@ public class AttendanceUseCase {
                     saved.getId(), record.getEmployeeId(),
                     record.getWorkDuration(), record.getOvertimeDuration()
             );
-            persistEvent(saved.getId(), "WORK_DURATION_CALCULATED", calcEvent, calcEvent.occurredAt());
+            persistEvent(saved.getId(), calcEvent);
             eventPublisher.publishEvent(calcEvent);
         }
 
@@ -411,7 +411,7 @@ public class AttendanceUseCase {
                 saved.getId(), employeeId, workDate,
                 manual.startTime(), manual.endTime(), manual.type(), manual.approvalId()
         );
-        persistEvent(saved.getId(), "MANUAL_ATTENDANCE_REGISTERED", manualEvent, manualEvent.occurredAt());
+        persistEvent(saved.getId(), manualEvent);
         eventPublisher.publishEvent(manualEvent);
 
         // WorkDurationCalculatedイベントを生成・保存・発行する
@@ -419,7 +419,7 @@ public class AttendanceUseCase {
                 saved.getId(), employeeId,
                 calcResult.workDuration(), calcResult.overtimeDuration()
         );
-        persistEvent(saved.getId(), "WORK_DURATION_CALCULATED", calcEvent, calcEvent.occurredAt());
+        persistEvent(saved.getId(), calcEvent);
         eventPublisher.publishEvent(calcEvent);
 
         log.debug("手動勤務登録完了: attendanceId={}, netWorkMinutes={}",
@@ -461,7 +461,7 @@ public class AttendanceUseCase {
         AttendanceFinalizedEvent event = AttendanceFinalizedEvent.of(
                 saved.getId(), record.getEmployeeId(), record.getWorkDate(), monthlyClosingId
         );
-        persistEvent(saved.getId(), "ATTENDANCE_FINALIZED", event, event.occurredAt());
+        persistEvent(saved.getId(), event);
         eventPublisher.publishEvent(event);
 
         log.debug("本締め確定完了: attendanceId={}", saved.getId().value());
@@ -545,23 +545,21 @@ public class AttendanceUseCase {
      * ドメインイベントをイベントストアに保存する
      *
      * <p>イベントオブジェクトをJacksonでJSON文字列に変換し、
-     * attendance_eventsテーブルにINSERTする。</p>
+     * attendance_eventsテーブルにINSERTする。
+     * eventType・occurredAt はイベント自身から取得する（型安全）。</p>
      *
      * @param attendanceId 勤怠記録ID
-     * @param eventType    イベント種別（CLOCKED_IN, CLOCKED_OUT 等）
-     * @param event        ドメインイベントオブジェクト
-     * @param occurredAt   イベント発生日時
+     * @param event        ドメインイベント（DomainEvent基底クラス）
      */
-    private void persistEvent(AttendanceRecordId attendanceId, String eventType,
-                               Object event, Instant occurredAt) {
+    private void persistEvent(AttendanceRecordId attendanceId, DomainEvent event) {
         try {
             // イベントオブジェクトをJSON文字列に変換する
             String payloadJson = objectMapper.writeValueAsString(event);
             // イベントストアに追記する（INSERT ONLY）
-            attendanceEventRepository.append(attendanceId, eventType, payloadJson, occurredAt);
+            attendanceEventRepository.append(event.getEventId(), attendanceId, event.getEventType(), payloadJson, event.getOccurredAt());
         } catch (JacksonException e) {
             throw new IllegalStateException(
-                    "イベントのJSON変換に失敗しました: eventType=" + eventType, e);
+                    "イベントのJSON変換に失敗しました: eventType=" + event.getEventType(), e);
         }
     }
 }

@@ -13,6 +13,7 @@ import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ScheduleId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -22,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 
@@ -155,7 +155,7 @@ public class WeeklyScheduleUseCase {
         );
 
         // イベントストアに追記する（INSERT ONLY）
-        persistEvent(saved.getId(), "ASSIGNED", event, event.occurredAt());
+        persistEvent(saved.getId(), event);
 
         // Springイベントとして発行する（プロジェクターがRead Modelを更新）
         eventPublisher.publishEvent(event);
@@ -216,7 +216,7 @@ public class WeeklyScheduleUseCase {
         );
 
         // イベントストアに追記する（INSERT ONLY）
-        persistEvent(schedule.getId(), "CHANGED", event, event.occurredAt());
+        persistEvent(schedule.getId(), event);
 
         // Springイベントとして発行する（プロジェクターがRead Modelを更新）
         eventPublisher.publishEvent(event);
@@ -268,7 +268,7 @@ public class WeeklyScheduleUseCase {
         );
 
         // イベントストアに追記する（INSERT ONLY）
-        persistEvent(schedule.getId(), "PUBLISHED", event, event.occurredAt());
+        persistEvent(schedule.getId(), event);
 
         // Springイベントとして発行する（プロジェクターがRead Modelのステータスを更新）
         eventPublisher.publishEvent(event);
@@ -317,7 +317,7 @@ public class WeeklyScheduleUseCase {
         );
 
         // イベントストアに追記する（INSERT ONLY）
-        persistEvent(schedule.getId(), "UNPUBLISHED", event, event.occurredAt());
+        persistEvent(schedule.getId(), event);
 
         // Springイベントとして発行する（プロジェクターがRead ModelのステータスをDRAFTに更新）
         eventPublisher.publishEvent(event);
@@ -387,23 +387,21 @@ public class WeeklyScheduleUseCase {
      * ドメインイベントをイベントストアに保存する
      *
      * <p>イベントオブジェクトをJacksonでJSON文字列に変換し、
-     * weekly_schedule_eventsテーブルにINSERTする。</p>
+     * weekly_schedule_eventsテーブルにINSERTする。
+     * eventType・occurredAt はイベント自身から取得する（型安全）。</p>
      *
      * @param scheduleId スケジュールID
-     * @param eventType  イベント種別（ASSIGNED, CHANGED, PUBLISHED, UNPUBLISHED）
-     * @param event      ドメインイベントオブジェクト
-     * @param occurredAt イベント発生日時
+     * @param event      ドメインイベント（DomainEvent基底クラス）
      */
-    private void persistEvent(ScheduleId scheduleId, String eventType,
-                               Object event, Instant occurredAt) {
+    private void persistEvent(ScheduleId scheduleId, DomainEvent event) {
         try {
             // イベントオブジェクトをJSON文字列に変換する
             String payloadJson = objectMapper.writeValueAsString(event);
             // イベントストアに追記する（INSERT ONLY）
-            weeklyScheduleEventRepository.append(scheduleId, eventType, payloadJson, occurredAt);
+            weeklyScheduleEventRepository.append(event.getEventId(), scheduleId, event.getEventType(), payloadJson, event.getOccurredAt());
         } catch (JacksonException e) {
             throw new IllegalStateException(
-                    "イベントのJSON変換に失敗しました: eventType=" + eventType, e);
+                    "イベントのJSON変換に失敗しました: eventType=" + event.getEventType(), e);
         }
     }
 }

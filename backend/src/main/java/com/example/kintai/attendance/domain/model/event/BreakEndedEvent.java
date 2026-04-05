@@ -3,6 +3,7 @@ package com.example.kintai.attendance.domain.model.event;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -16,42 +17,50 @@ import java.util.Objects;
  *   <li>Read Model（attendance_summaries）の休憩時間を更新</li>
  * </ul>
  * </p>
- *
- * @param attendanceRecordId 勤怠記録ID
- * @param employeeId         従業員ID
- * @param clockTime          休憩終了時刻
- * @param breakMinutes       今回の休憩時間（分）— 休憩開始〜終了の差分
- * @param occurredAt         イベント発生日時
  */
-public record BreakEndedEvent(
-        AttendanceRecordId attendanceRecordId,
-        EmployeeId employeeId,
-        ClockTime clockTime,
-        int breakMinutes,
-        Instant occurredAt
-) {
+public class BreakEndedEvent extends DomainEvent {
+
+    /** 勤怠記録ID */
+    private final AttendanceRecordId attendanceRecordId;
+    /** 従業員ID */
+    private final EmployeeId employeeId;
+    /** 休憩終了時刻 */
+    private final ClockTime clockTime;
+    /** 今回の休憩時間（分）— 休憩開始〜終了の差分 */
+    private final int breakMinutes;
 
     /**
-     * コンパクトコンストラクタ — 全フィールドのnullチェックを行う
+     * コンストラクタ — 固有フィールドのnullチェックを行い、基底クラスで eventId・occurredAt を自動設定する
      */
-    public BreakEndedEvent {
-        Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
-        Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
-        Objects.requireNonNull(clockTime, "休憩終了時刻はnullにできません");
-        Objects.requireNonNull(occurredAt, "イベント発生日時はnullにできません");
+    public BreakEndedEvent(
+            AttendanceRecordId attendanceRecordId,
+            EmployeeId employeeId,
+            ClockTime clockTime,
+            int breakMinutes
+    ) {
+        super();
+        this.attendanceRecordId = Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
+        this.employeeId = Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
+        this.clockTime = Objects.requireNonNull(clockTime, "休憩終了時刻はnullにできません");
+        this.breakMinutes = breakMinutes;
     }
+
+    @Override
+    public String getEventType() {
+        return "BREAK_ENDED";
+    }
+
+    public AttendanceRecordId attendanceRecordId() { return attendanceRecordId; }
+    public EmployeeId employeeId() { return employeeId; }
+    public ClockTime clockTime() { return clockTime; }
+    public int breakMinutes() { return breakMinutes; }
+    public Instant occurredAt() { return getOccurredAt(); }
 
     /**
      * イベントを生成するファクトリメソッド
      *
      * <p>AttendanceRecordのendBreak()成功後に呼び出される。
-     * breakMinutesは休憩開始時刻と終了時刻の差分から算出される。</p>
-     *
-     * @param attendanceRecordId 勤怠記録ID
-     * @param employeeId         従業員ID
-     * @param clockTime          休憩終了時刻
-     * @param breakMinutes       今回の休憩時間（分）
-     * @return BreakEndedEventインスタンス
+     * eventId・occurredAt は基底クラスで自動設定される。</p>
      */
     public static BreakEndedEvent of(
             AttendanceRecordId attendanceRecordId,
@@ -59,12 +68,6 @@ public record BreakEndedEvent(
             ClockTime clockTime,
             int breakMinutes
     ) {
-        return new BreakEndedEvent(
-                attendanceRecordId,
-                employeeId,
-                clockTime,
-                breakMinutes,
-                Instant.now()
-        );
+        return new BreakEndedEvent(attendanceRecordId, employeeId, clockTime, breakMinutes);
     }
 }

@@ -16,10 +16,11 @@ public interface AttendanceEventRepository {
     /**
      * ドメインイベントをイベントストアに追記する
      *
+     * @param eventId      ドメインイベントID（DomainEvent基底クラスで自動生成されたUUID）
      * @param attendanceId 対象の勤怠記録ID
      * @param eventType    イベント種別（CLOCKED_IN, CLOCKED_OUT 等）
      * @param payloadJson  イベントデータのJSON文字列
      * @param occurredAt   イベント発生日時
      */
-    void append(AttendanceRecordId attendanceId, String eventType, String payloadJson, Instant occurredAt);
+    void append(java.util.UUID eventId, AttendanceRecordId attendanceId, String eventType, String payloadJson, Instant occurredAt);
 }

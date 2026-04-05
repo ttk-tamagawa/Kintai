@@ -6,6 +6,7 @@ import com.example.kintai.attendance.domain.model.WorkDate;
 import com.example.kintai.shared.domain.model.ApprovalId;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -20,55 +21,65 @@ import java.util.Objects;
  *   <li>登録履歴の監査ログ記録</li>
  * </ul>
  * </p>
- *
- * @param attendanceRecordId 勤怠記録ID
- * @param employeeId         従業員ID
- * @param workDate           勤務日
- * @param startTime          勤務開始時刻
- * @param endTime            勤務終了時刻
- * @param type               勤務種別（NORMAL, BUSINESS_TRIP, REMOTE, PAID_LEAVE, ABSENCE）
- * @param approvalId         承認ID（どの承認に基づく登録か）
- * @param occurredAt         イベント発生日時
  */
-public record ManualAttendanceRegisteredEvent(
-        AttendanceRecordId attendanceRecordId,
-        EmployeeId employeeId,
-        WorkDate workDate,
-        ClockTime startTime,
-        ClockTime endTime,
-        AttendanceType type,
-        ApprovalId approvalId,
-        Instant occurredAt
-) {
+public class ManualAttendanceRegisteredEvent extends DomainEvent {
+
+    /** 勤怠記録ID */
+    private final AttendanceRecordId attendanceRecordId;
+    /** 従業員ID */
+    private final EmployeeId employeeId;
+    /** 勤務日 */
+    private final WorkDate workDate;
+    /** 勤務開始時刻 */
+    private final ClockTime startTime;
+    /** 勤務終了時刻 */
+    private final ClockTime endTime;
+    /** 勤務種別（NORMAL, BUSINESS_TRIP, REMOTE, PAID_LEAVE, ABSENCE） */
+    private final AttendanceType type;
+    /** 承認ID（どの承認に基づく登録か） */
+    private final ApprovalId approvalId;
 
     /**
-     * コンパクトコンストラクタ — 全フィールドのnullチェックを行う
+     * コンストラクタ — 固有フィールドのnullチェックを行い、基底クラスで eventId・occurredAt を自動設定する
      */
-    public ManualAttendanceRegisteredEvent {
-        Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
-        Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
-        Objects.requireNonNull(workDate, "勤務日はnullにできません");
-        Objects.requireNonNull(startTime, "勤務開始時刻はnullにできません");
-        Objects.requireNonNull(endTime, "勤務終了時刻はnullにできません");
-        Objects.requireNonNull(type, "勤務種別はnullにできません");
-        Objects.requireNonNull(approvalId, "承認IDはnullにできません");
-        Objects.requireNonNull(occurredAt, "イベント発生日時はnullにできません");
+    public ManualAttendanceRegisteredEvent(
+            AttendanceRecordId attendanceRecordId,
+            EmployeeId employeeId,
+            WorkDate workDate,
+            ClockTime startTime,
+            ClockTime endTime,
+            AttendanceType type,
+            ApprovalId approvalId
+    ) {
+        super();
+        this.attendanceRecordId = Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
+        this.employeeId = Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
+        this.workDate = Objects.requireNonNull(workDate, "勤務日はnullにできません");
+        this.startTime = Objects.requireNonNull(startTime, "勤務開始時刻はnullにできません");
+        this.endTime = Objects.requireNonNull(endTime, "勤務終了時刻はnullにできません");
+        this.type = Objects.requireNonNull(type, "勤務種別はnullにできません");
+        this.approvalId = Objects.requireNonNull(approvalId, "承認IDはnullにできません");
     }
+
+    @Override
+    public String getEventType() {
+        return "MANUAL_ATTENDANCE_REGISTERED";
+    }
+
+    public AttendanceRecordId attendanceRecordId() { return attendanceRecordId; }
+    public EmployeeId employeeId() { return employeeId; }
+    public WorkDate workDate() { return workDate; }
+    public ClockTime startTime() { return startTime; }
+    public ClockTime endTime() { return endTime; }
+    public AttendanceType type() { return type; }
+    public ApprovalId approvalId() { return approvalId; }
+    public Instant occurredAt() { return getOccurredAt(); }
 
     /**
      * イベントを生成するファクトリメソッド
      *
      * <p>AttendanceRecordのregisterManualAttendance()成功後に呼び出される。
-     * 打刻漏れ等で出退勤記録がない場合の手動補完に使用される。</p>
-     *
-     * @param attendanceRecordId 勤怠記録ID
-     * @param employeeId         従業員ID
-     * @param workDate           勤務日
-     * @param startTime          勤務開始時刻
-     * @param endTime            勤務終了時刻
-     * @param type               勤務種別
-     * @param approvalId         承認ID
-     * @return ManualAttendanceRegisteredEventインスタンス
+     * eventId・occurredAt は基底クラスで自動設定される。</p>
      */
     public static ManualAttendanceRegisteredEvent of(
             AttendanceRecordId attendanceRecordId,
@@ -80,14 +91,6 @@ public record ManualAttendanceRegisteredEvent(
             ApprovalId approvalId
     ) {
         return new ManualAttendanceRegisteredEvent(
-                attendanceRecordId,
-                employeeId,
-                workDate,
-                startTime,
-                endTime,
-                type,
-                approvalId,
-                Instant.now()
-        );
+                attendanceRecordId, employeeId, workDate, startTime, endTime, type, approvalId);
     }
 }

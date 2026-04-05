@@ -3,6 +3,7 @@ package com.example.kintai.attendance.domain.model.event;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -16,49 +17,51 @@ import java.util.Objects;
  *   <li>リアルタイム通知（休憩開始のフィードバック）</li>
  * </ul>
  * </p>
- *
- * @param attendanceRecordId 勤怠記録ID
- * @param employeeId         従業員ID
- * @param clockTime          休憩開始時刻
- * @param occurredAt         イベント発生日時
  */
-public record BreakStartedEvent(
-        AttendanceRecordId attendanceRecordId,
-        EmployeeId employeeId,
-        ClockTime clockTime,
-        Instant occurredAt
-) {
+public class BreakStartedEvent extends DomainEvent {
+
+    /** 勤怠記録ID */
+    private final AttendanceRecordId attendanceRecordId;
+    /** 従業員ID */
+    private final EmployeeId employeeId;
+    /** 休憩開始時刻 */
+    private final ClockTime clockTime;
 
     /**
-     * コンパクトコンストラクタ — 全フィールドのnullチェックを行う
+     * コンストラクタ — 固有フィールドのnullチェックを行い、基底クラスで eventId・occurredAt を自動設定する
      */
-    public BreakStartedEvent {
-        Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
-        Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
-        Objects.requireNonNull(clockTime, "休憩開始時刻はnullにできません");
-        Objects.requireNonNull(occurredAt, "イベント発生日時はnullにできません");
+    public BreakStartedEvent(
+            AttendanceRecordId attendanceRecordId,
+            EmployeeId employeeId,
+            ClockTime clockTime
+    ) {
+        super();
+        this.attendanceRecordId = Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
+        this.employeeId = Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
+        this.clockTime = Objects.requireNonNull(clockTime, "休憩開始時刻はnullにできません");
     }
+
+    @Override
+    public String getEventType() {
+        return "BREAK_STARTED";
+    }
+
+    public AttendanceRecordId attendanceRecordId() { return attendanceRecordId; }
+    public EmployeeId employeeId() { return employeeId; }
+    public ClockTime clockTime() { return clockTime; }
+    public Instant occurredAt() { return getOccurredAt(); }
 
     /**
      * イベントを生成するファクトリメソッド
      *
-     * <p>AttendanceRecordのstartBreak()成功後に呼び出される。</p>
-     *
-     * @param attendanceRecordId 勤怠記録ID
-     * @param employeeId         従業員ID
-     * @param clockTime          休憩開始時刻
-     * @return BreakStartedEventインスタンス
+     * <p>AttendanceRecordのstartBreak()成功後に呼び出される。
+     * eventId・occurredAt は基底クラスで自動設定される。</p>
      */
     public static BreakStartedEvent of(
             AttendanceRecordId attendanceRecordId,
             EmployeeId employeeId,
             ClockTime clockTime
     ) {
-        return new BreakStartedEvent(
-                attendanceRecordId,
-                employeeId,
-                clockTime,
-                Instant.now()
-        );
+        return new BreakStartedEvent(attendanceRecordId, employeeId, clockTime);
     }
 }

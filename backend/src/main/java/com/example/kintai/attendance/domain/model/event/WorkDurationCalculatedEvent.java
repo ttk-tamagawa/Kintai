@@ -4,6 +4,7 @@ import com.example.kintai.attendance.domain.model.OvertimeDuration;
 import com.example.kintai.attendance.domain.model.WorkDuration;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -18,43 +19,50 @@ import java.util.Objects;
  *   <li>部門統計（department_attendance_stats）のリフレッシュトリガー</li>
  * </ul>
  * </p>
- *
- * @param attendanceRecordId 勤怠記録ID
- * @param employeeId         従業員ID
- * @param workDuration       計算された勤務時間（所定/実/休憩/実労働の4内訳）
- * @param overtimeDuration   計算された残業時間（通常/深夜/休日/合計の4区分）
- * @param occurredAt         イベント発生日時
  */
-public record WorkDurationCalculatedEvent(
-        AttendanceRecordId attendanceRecordId,
-        EmployeeId employeeId,
-        WorkDuration workDuration,
-        OvertimeDuration overtimeDuration,
-        Instant occurredAt
-) {
+public class WorkDurationCalculatedEvent extends DomainEvent {
+
+    /** 勤怠記録ID */
+    private final AttendanceRecordId attendanceRecordId;
+    /** 従業員ID */
+    private final EmployeeId employeeId;
+    /** 計算された勤務時間（所定/実/休憩/実労働の4内訳） */
+    private final WorkDuration workDuration;
+    /** 計算された残業時間（通常/深夜/休日/合計の4区分） */
+    private final OvertimeDuration overtimeDuration;
 
     /**
-     * コンパクトコンストラクタ — 全フィールドのnullチェックを行う
+     * コンストラクタ — 固有フィールドのnullチェックを行い、基底クラスで eventId・occurredAt を自動設定する
      */
-    public WorkDurationCalculatedEvent {
-        Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
-        Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
-        Objects.requireNonNull(workDuration, "勤務時間はnullにできません");
-        Objects.requireNonNull(overtimeDuration, "残業時間はnullにできません");
-        Objects.requireNonNull(occurredAt, "イベント発生日時はnullにできません");
+    public WorkDurationCalculatedEvent(
+            AttendanceRecordId attendanceRecordId,
+            EmployeeId employeeId,
+            WorkDuration workDuration,
+            OvertimeDuration overtimeDuration
+    ) {
+        super();
+        this.attendanceRecordId = Objects.requireNonNull(attendanceRecordId, "勤怠記録IDはnullにできません");
+        this.employeeId = Objects.requireNonNull(employeeId, "従業員IDはnullにできません");
+        this.workDuration = Objects.requireNonNull(workDuration, "勤務時間はnullにできません");
+        this.overtimeDuration = Objects.requireNonNull(overtimeDuration, "残業時間はnullにできません");
     }
+
+    @Override
+    public String getEventType() {
+        return "WORK_DURATION_CALCULATED";
+    }
+
+    public AttendanceRecordId attendanceRecordId() { return attendanceRecordId; }
+    public EmployeeId employeeId() { return employeeId; }
+    public WorkDuration workDuration() { return workDuration; }
+    public OvertimeDuration overtimeDuration() { return overtimeDuration; }
+    public Instant occurredAt() { return getOccurredAt(); }
 
     /**
      * イベントを生成するファクトリメソッド
      *
      * <p>ドメインサービス（WorkDurationCalculator）による計算完了後に呼び出される。
-     * 退勤打刻時および打刻修正時にトリガーされる。</p>
-     *
-     * @param attendanceRecordId 勤怠記録ID
-     * @param employeeId         従業員ID
-     * @param workDuration       計算された勤務時間
-     * @param overtimeDuration   計算された残業時間
-     * @return WorkDurationCalculatedEventインスタンス
+     * eventId・occurredAt は基底クラスで自動設定される。</p>
      */
     public static WorkDurationCalculatedEvent of(
             AttendanceRecordId attendanceRecordId,
@@ -62,12 +70,6 @@ public record WorkDurationCalculatedEvent(
             WorkDuration workDuration,
             OvertimeDuration overtimeDuration
     ) {
-        return new WorkDurationCalculatedEvent(
-                attendanceRecordId,
-                employeeId,
-                workDuration,
-                overtimeDuration,
-                Instant.now()
-        );
+        return new WorkDurationCalculatedEvent(attendanceRecordId, employeeId, workDuration, overtimeDuration);
     }
 }
