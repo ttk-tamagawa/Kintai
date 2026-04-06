@@ -2,8 +2,8 @@ package com.example.kintai.attendance.application.command;
 
 import com.example.kintai.attendance.domain.model.shift.PatternName;
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
-import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternDefinedEvent;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import org.slf4j.Logger;
@@ -114,12 +114,11 @@ public class ShiftPatternUseCase {
         // リポジトリに保存する（JPAが自動的にpersistを実行）
         ShiftPattern saved = shiftPatternRepository.save(pattern);
 
-        // ShiftPatternDefinedEventを生成して発行する（プロジェクターがRead Modelを更新）
-        ShiftPatternDefinedEvent event = ShiftPatternDefinedEvent.of(
-                saved.getId(), saved.getName(),
-                saved.getStartTime(), saved.getEndTime(), saved.isOvernight()
-        );
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で発行する（ShiftPatternはイベントストアを使用しない）
+        for (DomainEvent event : saved.getDomainEvents()) {
+            eventPublisher.publishEvent(event);
+        }
+        saved.clearDomainEvents();
 
         log.debug("シフトパターン定義完了: patternId={}", saved.getId().value());
         return saved.getId();

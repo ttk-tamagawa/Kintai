@@ -1,6 +1,8 @@
 package com.example.kintai.attendance.domain.model.shift;
 
+import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternDefinedEvent;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.AggregateRoot;
 
 import java.time.Instant;
 import java.time.LocalTime;
@@ -21,7 +23,7 @@ import java.util.Objects;
  * </ul>
  * </p>
  */
-public class ShiftPattern {
+public class ShiftPattern extends AggregateRoot {
 
     /** シフトパターンID */
     private final ShiftPatternId id;
@@ -135,7 +137,7 @@ public class ShiftPattern {
         }
 
         Instant now = Instant.now();
-        return new ShiftPattern(
+        ShiftPattern pattern = new ShiftPattern(
                 ShiftPatternId.generate(),
                 name,
                 startTime,
@@ -147,6 +149,13 @@ public class ShiftPattern {
                 now,
                 now
         );
+
+        // シフトパターン定義イベントを登録する
+        pattern.registerEvent(ShiftPatternDefinedEvent.of(
+                pattern.id, name, startTime, endTime, isOvernight
+        ));
+
+        return pattern;
     }
 
     // ========================

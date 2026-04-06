@@ -1,8 +1,13 @@
 package com.example.kintai.attendance.domain.model.shift;
 
+import com.example.kintai.attendance.domain.model.shift.event.SchedulePublishedEvent;
+import com.example.kintai.attendance.domain.model.shift.event.ScheduleUnpublishedEvent;
+import com.example.kintai.attendance.domain.model.shift.event.ShiftAssignedEvent;
+import com.example.kintai.attendance.domain.model.shift.event.ShiftChangedEvent;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ScheduleId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.AggregateRoot;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -36,7 +41,7 @@ import java.util.Objects;
  * </ul>
  * </p>
  */
-public class WeeklySchedule {
+public class WeeklySchedule extends AggregateRoot {
 
     /** スケジュールID */
     private final ScheduleId id;
@@ -146,7 +151,7 @@ public class WeeklySchedule {
         }
 
         Instant now = Instant.now();
-        return new WeeklySchedule(
+        WeeklySchedule schedule = new WeeklySchedule(
                 ScheduleId.generate(),
                 employeeId,
                 weekStartDate,
@@ -156,6 +161,13 @@ public class WeeklySchedule {
                 now,
                 now
         );
+
+        // シフト割当イベントを登録する
+        schedule.registerEvent(ShiftAssignedEvent.of(
+                schedule.id, employeeId, weekStartDate, assignments, ScheduleStatus.DRAFT
+        ));
+
+        return schedule;
     }
 
     // ========================
@@ -177,6 +189,9 @@ public class WeeklySchedule {
             throw new IllegalArgumentException("最低1日はシフトパターンを割り当ててください");
         }
 
+        // 変更前のステータスを退避する（イベント記録用）
+        ScheduleStatus previousStatus = status;
+
         // 既存の割当をクリアして新しい割当に差し替える
         assignments.clear();
         assignments.putAll(newAssignments);
@@ -187,6 +202,9 @@ public class WeeklySchedule {
         }
 
         updatedAt = Instant.now();
+
+        // シフト変更イベントを登録する
+        registerEvent(ShiftChangedEvent.of(id, employeeId, assignments, previousStatus));
     }
 
     /**
@@ -208,6 +226,9 @@ public class WeeklySchedule {
         // ステータスをPUBLISHEDに遷移する
         status = ScheduleStatus.PUBLISHED;
         updatedAt = Instant.now();
+
+        // スケジュール公開イベントを登録する
+        registerEvent(SchedulePublishedEvent.of(id, employeeId, weekStartDate));
     }
 
     /**
@@ -229,6 +250,9 @@ public class WeeklySchedule {
         // ステータスをDRAFTに戻す
         status = ScheduleStatus.DRAFT;
         updatedAt = Instant.now();
+
+        // スケジュール非公開イベントを登録する
+        registerEvent(ScheduleUnpublishedEvent.of(id, employeeId, weekStartDate));
     }
 
     // ========================

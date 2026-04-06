@@ -1,10 +1,20 @@
 package com.example.kintai.attendance.domain.model;
 
+import com.example.kintai.attendance.domain.model.event.AttendanceFinalizedEvent;
+import com.example.kintai.attendance.domain.model.event.BreakEndedEvent;
+import com.example.kintai.attendance.domain.model.event.BreakStartedEvent;
+import com.example.kintai.attendance.domain.model.event.ClockCorrectedEvent;
+import com.example.kintai.attendance.domain.model.event.ClockedInEvent;
+import com.example.kintai.attendance.domain.model.event.ClockedOutEvent;
+import com.example.kintai.attendance.domain.model.event.ManualAttendanceRegisteredEvent;
+import com.example.kintai.attendance.domain.model.event.WorkDurationCalculatedEvent;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.AggregateRoot;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,7 +47,7 @@ import java.util.Objects;
  * </ul>
  * </p>
  */
-public class AttendanceRecord {
+public class AttendanceRecord extends AggregateRoot {
 
     /** 勤怠記録ID */
     private final AttendanceRecordId id;
@@ -217,6 +227,9 @@ public class AttendanceRecord {
         // ステータスを出勤中に遷移
         status = AttendanceStatus.CLOCKED_IN;
         updatedAt = Instant.now();
+
+        // 出勤打刻イベントを登録する
+        registerEvent(ClockedInEvent.of(id, employeeId, workDate, time, source));
     }
 
     /**
@@ -253,6 +266,9 @@ public class AttendanceRecord {
         // ステータスを退勤済みに遷移
         status = AttendanceStatus.CLOCKED_OUT;
         updatedAt = Instant.now();
+
+        // 退勤打刻イベントを登録する
+        registerEvent(ClockedOutEvent.of(id, employeeId, time, source));
     }
 
     /**
@@ -296,6 +312,9 @@ public class AttendanceRecord {
         // 休憩開始エントリを追加（ステータスはCLOCKED_INのまま）
         clockEntries.add(new ClockEntry(ClockType.BREAK_START, time, source));
         updatedAt = Instant.now();
+
+        // 休憩開始イベントを登録する
+        registerEvent(BreakStartedEvent.of(id, employeeId, time));
     }
 
     /**
@@ -336,9 +355,15 @@ public class AttendanceRecord {
             );
         }
 
+        // 今回の休憩時間（分）を算出する（BREAK_START → BREAK_END の差分）
+        int breakMinutes = (int) Duration.between(breakStartTime.value(), time.value()).toMinutes();
+
         // 休憩終了エントリを追加（ステータスはCLOCKED_INのまま）
         clockEntries.add(new ClockEntry(ClockType.BREAK_END, time, source));
         updatedAt = Instant.now();
+
+        // 休憩終了イベントを登録する（休憩時間を含む）
+        registerEvent(BreakEndedEvent.of(id, employeeId, time, breakMinutes));
     }
 
     /**
@@ -360,6 +385,9 @@ public class AttendanceRecord {
             );
         }
 
+        // 修正前の打刻時刻を取得する（イベント記録用。修正エントリ追加前に取得する）
+        ClockTime beforeTime = getEffectiveTimeOfType(correction.targetType());
+
         // 修正エントリを追加（source=CORRECTIONで新規追加。元の打刻は保持）
         clockEntries.add(new ClockEntry(
                 correction.targetType(),
@@ -367,6 +395,12 @@ public class AttendanceRecord {
                 ClockSource.CORRECTION
         ));
         updatedAt = Instant.now();
+
+        // 打刻修正イベントを登録する
+        registerEvent(ClockCorrectedEvent.of(
+                id, employeeId, correction.targetType(),
+                beforeTime, correction.correctedTime(), correction.approvalId()
+        ));
     }
 
     /**
@@ -412,6 +446,12 @@ public class AttendanceRecord {
         // ステータスを退勤済みに遷移（出勤→退勤を一度に行う）
         status = AttendanceStatus.CLOCKED_OUT;
         updatedAt = Instant.now();
+
+        // 手動勤務登録イベントを登録する
+        registerEvent(ManualAttendanceRegisteredEvent.of(
+                id, employeeId, workDate,
+                manual.startTime(), manual.endTime(), manual.type(), manual.approvalId()
+        ));
     }
 
     /**
@@ -435,6 +475,9 @@ public class AttendanceRecord {
         // ステータスを確定済みに遷移
         status = AttendanceStatus.FINALIZED;
         updatedAt = Instant.now();
+
+        // 本締め確定イベントを登録する
+        registerEvent(AttendanceFinalizedEvent.of(id, employeeId, workDate, monthlyClosingId));
     }
 
     // ========================
@@ -457,6 +500,9 @@ public class AttendanceRecord {
         this.workDuration = duration;
         this.overtimeDuration = overtime;
         this.updatedAt = Instant.now();
+
+        // 勤務時間計算イベントを登録する
+        registerEvent(WorkDurationCalculatedEvent.of(id, employeeId, duration, overtime));
     }
 
     // ========================
@@ -490,6 +536,20 @@ public class AttendanceRecord {
     private ClockTime getLastBreakStartTime() {
         return clockEntries.stream()
                 .filter(entry -> entry.type() == ClockType.BREAK_START)
+                .reduce((first, second) -> second)
+                .map(ClockEntry::time)
+                .orElse(null);
+    }
+
+    /**
+     * 指定された打刻種別の最新の打刻時刻を取得する — 打刻修正イベントの修正前時刻の取得に使用
+     *
+     * @param type 打刻種別
+     * @return 最新の打刻時刻（該当エントリがない場合はnull）
+     */
+    private ClockTime getEffectiveTimeOfType(ClockType type) {
+        return clockEntries.stream()
+                .filter(entry -> entry.type() == type)
                 .reduce((first, second) -> second)
                 .map(ClockEntry::time)
                 .orElse(null);

@@ -1,12 +1,7 @@
 package com.example.kintai.attendance.application.command;
 
-import com.example.kintai.attendance.domain.model.shift.ScheduleStatus;
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
-import com.example.kintai.attendance.domain.model.shift.event.SchedulePublishedEvent;
-import com.example.kintai.attendance.domain.model.shift.event.ScheduleUnpublishedEvent;
-import com.example.kintai.attendance.domain.model.shift.event.ShiftAssignedEvent;
-import com.example.kintai.attendance.domain.model.shift.event.ShiftChangedEvent;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleEventRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
@@ -148,17 +143,8 @@ public class WeeklyScheduleUseCase {
         // リポジトリに保存する（JPAが自動的にpersistを実行）
         WeeklySchedule saved = weeklyScheduleRepository.save(schedule);
 
-        // ShiftAssignedEventを生成する
-        ShiftAssignedEvent event = ShiftAssignedEvent.of(
-                saved.getId(), saved.getEmployeeId(), saved.getWeekStartDate(),
-                saved.getAssignments(), saved.getStatus()
-        );
-
-        // イベントストアに追記する（INSERT ONLY）
-        persistEvent(saved.getId(), event);
-
-        // Springイベントとして発行する（プロジェクターがRead Modelを更新）
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
         log.debug("スケジュール割当完了: scheduleId={}", saved.getId().value());
         return new AssignResult(saved, patternNames);
@@ -175,11 +161,8 @@ public class WeeklyScheduleUseCase {
      * <ol>
      *   <li>スケジュールをリポジトリから取得する（存在しなければ例外）</li>
      *   <li>新しい割当パターンが全てACTIVEであることを検証する（INV-SH-002）</li>
-     *   <li>変更前のステータスを記録する（イベント用）</li>
-     *   <li>集約のchangeAssignments()を呼び出す（PUBLISHEDならDRAFTに戻る）</li>
-     *   <li>リポジトリに保存する</li>
-     *   <li>CHANGEDイベントをイベントストアに追記する</li>
-     *   <li>ShiftChangedEventを発行する（プロジェクターがRead Modelを更新）</li>
+     *   <li>集約のchangeAssignments()を呼び出す（PUBLISHEDならDRAFTに戻る、変更前ステータスは集約内で退避）</li>
+     *   <li>リポジトリに保存し、ドメインイベントを一括で永続化・発行する</li>
      * </ol>
      * </p>
      *
@@ -200,29 +183,17 @@ public class WeeklyScheduleUseCase {
         // 新しい割当パターンが全てACTIVEであることを検証し、パターン名を取得する（INV-SH-002）
         Map<ShiftPatternId, String> patternNames = validateAndCollectPatternNames(newAssignments);
 
-        // 変更前のステータスを記録する（イベントに含めるため）
-        ScheduleStatus previousStatus = schedule.getStatus();
-
-        // 集約のchangeAssignments()を呼び出す（PUBLISHEDならDRAFTに戻る）
+        // 集約のchangeAssignments()を呼び出す（PUBLISHEDならDRAFTに戻る、変更前ステータスは集約内で退避）
         schedule.changeAssignments(newAssignments);
 
         // リポジトリに保存する（楽観的ロックでバージョン管理）
         weeklyScheduleRepository.save(schedule);
 
-        // ShiftChangedEventを生成する
-        ShiftChangedEvent event = ShiftChangedEvent.of(
-                schedule.getId(), schedule.getEmployeeId(),
-                schedule.getAssignments(), previousStatus
-        );
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(schedule);
 
-        // イベントストアに追記する（INSERT ONLY）
-        persistEvent(schedule.getId(), event);
-
-        // Springイベントとして発行する（プロジェクターがRead Modelを更新）
-        eventPublisher.publishEvent(event);
-
-        log.debug("スケジュール変更完了: scheduleId={}, previousStatus={}, newStatus={}",
-                scheduleId.value(), previousStatus, schedule.getStatus());
+        log.debug("スケジュール変更完了: scheduleId={}, newStatus={}",
+                scheduleId.value(), schedule.getStatus());
         return new AssignResult(schedule, patternNames);
     }
 
@@ -262,16 +233,8 @@ public class WeeklyScheduleUseCase {
         // リポジトリに保存する（楽観的ロックでバージョン管理）
         weeklyScheduleRepository.save(schedule);
 
-        // SchedulePublishedEventを生成する（専用の公開イベント）
-        SchedulePublishedEvent event = SchedulePublishedEvent.of(
-                schedule.getId(), schedule.getEmployeeId(), schedule.getWeekStartDate()
-        );
-
-        // イベントストアに追記する（INSERT ONLY）
-        persistEvent(schedule.getId(), event);
-
-        // Springイベントとして発行する（プロジェクターがRead Modelのステータスを更新）
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(schedule);
 
         log.debug("スケジュール公開完了: scheduleId={}", scheduleId.value());
         return schedule;
@@ -311,16 +274,8 @@ public class WeeklyScheduleUseCase {
         // リポジトリに保存する（楽観的ロックでバージョン管理）
         weeklyScheduleRepository.save(schedule);
 
-        // ScheduleUnpublishedEventを生成する（専用の非公開イベント）
-        ScheduleUnpublishedEvent event = ScheduleUnpublishedEvent.of(
-                schedule.getId(), schedule.getEmployeeId(), schedule.getWeekStartDate()
-        );
-
-        // イベントストアに追記する（INSERT ONLY）
-        persistEvent(schedule.getId(), event);
-
-        // Springイベントとして発行する（プロジェクターがRead ModelのステータスをDRAFTに更新）
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(schedule);
 
         log.debug("スケジュール非公開完了: scheduleId={}", scheduleId.value());
         return schedule;
@@ -381,6 +336,26 @@ public class WeeklyScheduleUseCase {
         return weeklyScheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "スケジュールが見つかりません: " + scheduleId.value()));
+    }
+
+    /**
+     * 集約に蓄積されたドメインイベントを一括で永続化・発行する
+     *
+     * <p>集約のコマンドメソッドが registerEvent() で登録したイベントを
+     * getDomainEvents() で取得し、イベントストアへの記録と Spring イベント発行を行う。
+     * 処理完了後に clearDomainEvents() でイベントリストをクリアする。</p>
+     *
+     * @param schedule 保存済みの週次スケジュール（ドメインイベントが蓄積されている）
+     */
+    private void publishAndPersistEvents(WeeklySchedule schedule) {
+        for (DomainEvent event : schedule.getDomainEvents()) {
+            // イベントストアに記録する
+            persistEvent(schedule.getId(), event);
+            // Springイベントとして発行する（プロジェクターがRead Modelを更新）
+            eventPublisher.publishEvent(event);
+        }
+        // イベントリストをクリアして二重永続化を防止する
+        schedule.clearDomainEvents();
     }
 
     /**

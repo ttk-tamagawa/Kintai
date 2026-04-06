@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.application.command;
 
 import com.example.kintai.attendance.domain.model.*;
-import com.example.kintai.attendance.domain.model.event.*;
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.repository.AttendanceEventRepository;
 import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
@@ -20,9 +19,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.ZoneId;
-import java.util.List;
 
 /**
  * 勤怠記録ユースケース — 勤怠記録の7つの書き込みユースケースを統合するアプリケーションサービス
@@ -137,16 +134,8 @@ public class AttendanceUseCase {
         // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
 
-        // ドメインイベントを生成する
-        ClockedInEvent event = ClockedInEvent.of(
-                saved.getId(), employeeId, workDate, clockTime, source
-        );
-
-        // イベントストアに記録する
-        persistEvent(saved.getId(), event);
-
-        // イベントを発行する（プロジェクターがattendance_summariesを更新）
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
         log.debug("出勤打刻完了: attendanceId={}", saved.getId().value());
         return saved.getId();
@@ -189,20 +178,8 @@ public class AttendanceUseCase {
         // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
 
-        // ClockedOutイベントを生成・保存・発行する
-        ClockedOutEvent clockedOutEvent = ClockedOutEvent.of(
-                saved.getId(), record.getEmployeeId(), clockTime, source
-        );
-        persistEvent(saved.getId(), clockedOutEvent);
-        eventPublisher.publishEvent(clockedOutEvent);
-
-        // WorkDurationCalculatedイベントを生成・保存・発行する
-        WorkDurationCalculatedEvent calcEvent = WorkDurationCalculatedEvent.of(
-                saved.getId(), record.getEmployeeId(),
-                calcResult.workDuration(), calcResult.overtimeDuration()
-        );
-        persistEvent(saved.getId(), calcEvent);
-        eventPublisher.publishEvent(calcEvent);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
         log.debug("退勤打刻完了: attendanceId={}, netWorkMinutes={}",
                 saved.getId().value(), calcResult.workDuration().netWorkMinutes());
@@ -241,12 +218,8 @@ public class AttendanceUseCase {
         // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
 
-        // BreakStartedイベントを生成・保存・発行する
-        BreakStartedEvent event = BreakStartedEvent.of(
-                saved.getId(), record.getEmployeeId(), clockTime
-        );
-        persistEvent(saved.getId(), event);
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
         log.debug("休憩開始完了: attendanceId={}", saved.getId().value());
     }
@@ -261,10 +234,8 @@ public class AttendanceUseCase {
      * <p>処理フロー:
      * <ol>
      *   <li>勤怠記録を取得する</li>
-     *   <li>最後のBREAK_START時刻を取得する（休憩時間計算用）</li>
-     *   <li>集約のendBreak()を呼び出す（ステータスはCLOCKED_INのまま）</li>
-     *   <li>今回の休憩時間（分）を算出する</li>
-     *   <li>集約・打刻エントリ・イベントを保存し、イベントを発行する</li>
+     *   <li>集約のendBreak()を呼び出す（ステータスはCLOCKED_INのまま、休憩時間を集約内で計算）</li>
+     *   <li>集約・打刻エントリを保存し、ドメインイベントを一括で永続化・発行する</li>
      * </ol>
      * </p>
      *
@@ -277,26 +248,16 @@ public class AttendanceUseCase {
         AttendanceRecord record = findRecordOrThrow(id);
         log.debug("休憩終了: attendanceId={}", id.value());
 
-        // 最後のBREAK_START時刻を取得する（休憩時間計算のため、コマンド実行前に取得）
-        ClockTime lastBreakStart = findLatestTimeOfType(record.getClockEntries(), ClockType.BREAK_START);
-
-        // 集約の休憩終了コマンドを実行する（ステータス変化なし）
+        // 集約の休憩終了コマンドを実行する（ステータス変化なし、休憩時間は集約内で計算）
         record.endBreak(clockTime, source);
-
-        // 今回の休憩時間（分）を算出する（BREAK_START → BREAK_END の差分）
-        int breakMinutes = (int) Duration.between(lastBreakStart.value(), clockTime.value()).toMinutes();
 
         // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
 
-        // BreakEndedイベントを生成・保存・発行する（breakMinutesを含む）
-        BreakEndedEvent event = BreakEndedEvent.of(
-                saved.getId(), record.getEmployeeId(), clockTime, breakMinutes
-        );
-        persistEvent(saved.getId(), event);
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
-        log.debug("休憩終了完了: attendanceId={}, breakMinutes={}", saved.getId().value(), breakMinutes);
+        log.debug("休憩終了完了: attendanceId={}", saved.getId().value());
     }
 
     // ========================================
@@ -309,10 +270,9 @@ public class AttendanceUseCase {
      * <p>処理フロー:
      * <ol>
      *   <li>勤怠記録を取得する</li>
-     *   <li>修正前の打刻時刻を取得する（イベント記録用、修正実行前に取得）</li>
-     *   <li>集約のcorrectClock()を呼び出す（source=CORRECTIONの新エントリ追加）</li>
+     *   <li>集約のcorrectClock()を呼び出す（source=CORRECTIONの新エントリ追加、修正前時刻は集約内で取得）</li>
      *   <li>退勤済みの場合は勤務時間を再計算する</li>
-     *   <li>集約・打刻エントリ・イベントを保存し、イベントを発行する</li>
+     *   <li>集約・打刻エントリを保存し、ドメインイベントを一括で永続化・発行する</li>
      * </ol>
      * </p>
      *
@@ -324,10 +284,7 @@ public class AttendanceUseCase {
         AttendanceRecord record = findRecordOrThrow(id);
         log.debug("打刻修正: attendanceId={}, targetType={}", id.value(), correction.targetType());
 
-        // 修正前の打刻時刻を取得する（イベント記録用。修正実行前に取得する必要がある）
-        ClockTime beforeTime = findLatestTimeOfType(record.getClockEntries(), correction.targetType());
-
-        // 集約の打刻修正コマンドを実行する（source=CORRECTIONの新エントリが追加される）
+        // 集約の打刻修正コマンドを実行する（source=CORRECTIONの新エントリが追加される、修正前時刻は集約内で取得）
         record.correctClock(correction);
 
         // 退勤済みの場合は勤務時間を再計算する（出勤・退勤の両方が揃っている）
@@ -339,27 +296,10 @@ public class AttendanceUseCase {
         // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
 
-        // ClockCorrectedイベントを生成・保存・発行する
-        ClockCorrectedEvent correctedEvent = ClockCorrectedEvent.of(
-                saved.getId(), record.getEmployeeId(),
-                correction.targetType(), beforeTime, correction.correctedTime(),
-                correction.approvalId()
-        );
-        persistEvent(saved.getId(), correctedEvent);
-        eventPublisher.publishEvent(correctedEvent);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
-        // 退勤済みの場合は再計算イベントも発行する
-        if (record.getStatus() == AttendanceStatus.CLOCKED_OUT) {
-            WorkDurationCalculatedEvent calcEvent = WorkDurationCalculatedEvent.of(
-                    saved.getId(), record.getEmployeeId(),
-                    record.getWorkDuration(), record.getOvertimeDuration()
-            );
-            persistEvent(saved.getId(), calcEvent);
-            eventPublisher.publishEvent(calcEvent);
-        }
-
-        log.debug("打刻修正完了: attendanceId={}, {} → {}",
-                saved.getId().value(), beforeTime.value(), correction.correctedTime().value());
+        log.debug("打刻修正完了: attendanceId={}", saved.getId().value());
     }
 
     // ========================================
@@ -406,21 +346,8 @@ public class AttendanceUseCase {
         // 集約をリポジトリに保存する（新規打刻エントリはsave内で自動保存される）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
 
-        // ManualAttendanceRegisteredイベントを生成・保存・発行する
-        ManualAttendanceRegisteredEvent manualEvent = ManualAttendanceRegisteredEvent.of(
-                saved.getId(), employeeId, workDate,
-                manual.startTime(), manual.endTime(), manual.type(), manual.approvalId()
-        );
-        persistEvent(saved.getId(), manualEvent);
-        eventPublisher.publishEvent(manualEvent);
-
-        // WorkDurationCalculatedイベントを生成・保存・発行する
-        WorkDurationCalculatedEvent calcEvent = WorkDurationCalculatedEvent.of(
-                saved.getId(), employeeId,
-                calcResult.workDuration(), calcResult.overtimeDuration()
-        );
-        persistEvent(saved.getId(), calcEvent);
-        eventPublisher.publishEvent(calcEvent);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
         log.debug("手動勤務登録完了: attendanceId={}, netWorkMinutes={}",
                 saved.getId().value(), calcResult.workDuration().netWorkMinutes());
@@ -457,12 +384,8 @@ public class AttendanceUseCase {
         // 集約をリポジトリに保存する（打刻エントリの追加はなし）
         AttendanceRecord saved = attendanceRecordRepository.save(record);
 
-        // AttendanceFinalizedイベントを生成・保存・発行する
-        AttendanceFinalizedEvent event = AttendanceFinalizedEvent.of(
-                saved.getId(), record.getEmployeeId(), record.getWorkDate(), monthlyClosingId
-        );
-        persistEvent(saved.getId(), event);
-        eventPublisher.publishEvent(event);
+        // 集約に蓄積されたドメインイベントを一括で永続化・発行する
+        publishAndPersistEvents(saved);
 
         log.debug("本締め確定完了: attendanceId={}", saved.getId().value());
     }
@@ -521,24 +444,23 @@ public class AttendanceUseCase {
     }
 
     /**
-     * 指定種別の最新の打刻時刻を取得する（末尾から検索）
+     * 集約に蓄積されたドメインイベントを一括で永続化・発行する
      *
-     * <p>打刻修正（CORRECTION）がある場合は最後のエントリが有効な時刻となる。
-     * 修正前の時刻取得やBREAK_START時刻取得に使用する。</p>
+     * <p>集約のコマンドメソッドが registerEvent() で登録したイベントを
+     * getDomainEvents() で取得し、イベントストアへの記録と Spring イベント発行を行う。
+     * 処理完了後に clearDomainEvents() でイベントリストをクリアする。</p>
      *
-     * @param entries 打刻エントリ一覧
-     * @param type    取得する打刻種別
-     * @return 最新の打刻時刻
-     * @throws IllegalStateException 指定種別の打刻が見つからない場合
+     * @param record 保存済みの勤怠記録（ドメインイベントが蓄積されている）
      */
-    private ClockTime findLatestTimeOfType(List<ClockEntry> entries, ClockType type) {
-        // 末尾から検索して最新のエントリを取得する
-        for (int i = entries.size() - 1; i >= 0; i--) {
-            if (entries.get(i).type() == type) {
-                return entries.get(i).time();
-            }
+    private void publishAndPersistEvents(AttendanceRecord record) {
+        for (DomainEvent event : record.getDomainEvents()) {
+            // イベントストアに記録する
+            persistEvent(record.getId(), event);
+            // Springイベントとして発行する（プロジェクターがRead Modelを更新）
+            eventPublisher.publishEvent(event);
         }
-        throw new IllegalStateException(type + "の打刻が見つかりません");
+        // イベントリストをクリアして二重永続化を防止する
+        record.clearDomainEvents();
     }
 
     /**
