@@ -5,6 +5,8 @@
  * <ul>
  *   <li>{@link com.example.kintai.shared.kernel.contract.DomainEvent} — ドメインイベント基底クラス</li>
  *   <li>{@link com.example.kintai.shared.kernel.contract.AggregateRoot} — 集約ルート基底クラス</li>
+ *   <li>{@link com.example.kintai.shared.kernel.contract.Command} — コマンド入力マーカーインターフェース</li>
+ *   <li>{@link com.example.kintai.shared.kernel.contract.UseCase} — ユースケース実行インターフェース</li>
  * </ul>
  * </p>
  */

@@ -1,6 +1,11 @@
 package com.example.kintai.attendance.presentation.controller;
 
-import com.example.kintai.attendance.application.command.ShiftPatternUseCase;
+import com.example.kintai.attendance.application.command.DeactivatePatternCommand;
+import com.example.kintai.attendance.application.command.DeactivatePatternUseCase;
+import com.example.kintai.attendance.application.command.DefinePatternCommand;
+import com.example.kintai.attendance.application.command.DefinePatternUseCase;
+import com.example.kintai.attendance.application.command.ReactivatePatternCommand;
+import com.example.kintai.attendance.application.command.ReactivatePatternUseCase;
 import com.example.kintai.attendance.application.query.ShiftPatternQueryService;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.PatternSummary;
 import com.example.kintai.attendance.presentation.dto.DefinePatternRequest;
@@ -48,17 +53,27 @@ public class ShiftPatternController {
 
     private static final Logger log = LoggerFactory.getLogger(ShiftPatternController.class);
 
-    /** シフトパターンユースケース — 書き込みユースケースの実行を委譲する */
-    private final ShiftPatternUseCase commandService;
+    /** シフトパターン定義ユースケース（UC-SH-001） */
+    private final DefinePatternUseCase definePatternUseCase;
+
+    /** シフトパターン無効化ユースケース（UC-SH-002） */
+    private final DeactivatePatternUseCase deactivatePatternUseCase;
+
+    /** シフトパターン再有効化ユースケース（UC-SH-003） */
+    private final ReactivatePatternUseCase reactivatePatternUseCase;
 
     /** シフトパターンクエリサービス — 読み取りユースケースの実行を委譲する */
     private final ShiftPatternQueryService queryService;
 
     public ShiftPatternController(
-            ShiftPatternUseCase commandService,
+            DefinePatternUseCase definePatternUseCase,
+            DeactivatePatternUseCase deactivatePatternUseCase,
+            ReactivatePatternUseCase reactivatePatternUseCase,
             ShiftPatternQueryService queryService
     ) {
-        this.commandService = commandService;
+        this.definePatternUseCase = definePatternUseCase;
+        this.deactivatePatternUseCase = deactivatePatternUseCase;
+        this.reactivatePatternUseCase = reactivatePatternUseCase;
         this.queryService = queryService;
     }
 
@@ -86,14 +101,14 @@ public class ShiftPatternController {
 
         log.debug("パターン作成リクエスト受信: name={}", request.name());
 
-        // コマンドサービスでパターンを定義する（名前重複チェック、バリデーション含む）
-        ShiftPatternId patternId = commandService.definePattern(
+        // シフトパターン定義ユースケースを実行する（名前重複チェック、バリデーション含む）
+        ShiftPatternId patternId = definePatternUseCase.execute(new DefinePatternCommand(
                 request.name(),
                 request.startTime(),
                 request.endTime(),
                 request.breakMinutes(),
                 request.isOvernight()
-        );
+        ));
 
         // 作成されたパターンをクエリサービスで再取得する
         PatternSummary pattern = queryService.getPattern(patternId.value());
@@ -178,8 +193,8 @@ public class ShiftPatternController {
     public ResponseEntity<PatternResponse> deactivatePattern(@PathVariable UUID patternId) {
         log.debug("パターン無効化リクエスト受信: patternId={}", patternId);
 
-        // コマンドサービスで無効化を実行する（未来割当チェック、ACTIVEガード含む）
-        commandService.deactivatePattern(ShiftPatternId.of(patternId));
+        // シフトパターン無効化ユースケースを実行する（未来割当チェック、ACTIVEガード含む）
+        deactivatePatternUseCase.execute(new DeactivatePatternCommand(ShiftPatternId.of(patternId)));
 
         // 更新後のパターンをクエリサービスで再取得する
         PatternSummary pattern = queryService.getPattern(patternId);
@@ -210,8 +225,8 @@ public class ShiftPatternController {
     public ResponseEntity<PatternResponse> reactivatePattern(@PathVariable UUID patternId) {
         log.debug("パターン再有効化リクエスト受信: patternId={}", patternId);
 
-        // コマンドサービスで再有効化を実行する（INACTIVEガード含む）
-        commandService.reactivatePattern(ShiftPatternId.of(patternId));
+        // シフトパターン再有効化ユースケースを実行する（INACTIVEガード含む）
+        reactivatePatternUseCase.execute(new ReactivatePatternCommand(ShiftPatternId.of(patternId)));
 
         // 更新後のパターンをクエリサービスで再取得する
         PatternSummary pattern = queryService.getPattern(patternId);

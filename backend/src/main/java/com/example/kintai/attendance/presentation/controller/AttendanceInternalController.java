@@ -9,7 +9,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.kintai.attendance.application.command.AttendanceUseCase;
+import com.example.kintai.attendance.application.command.CorrectClockCommand;
+import com.example.kintai.attendance.application.command.CorrectClockUseCase;
+import com.example.kintai.attendance.application.command.FinalizeRecordCommand;
+import com.example.kintai.attendance.application.command.FinalizeRecordUseCase;
+import com.example.kintai.attendance.application.command.RegisterManualAttendanceCommand;
+import com.example.kintai.attendance.application.command.RegisterManualAttendanceUseCase;
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
 import com.example.kintai.attendance.domain.model.AttendanceStatus;
 import com.example.kintai.attendance.domain.model.AttendanceType;
@@ -56,16 +61,26 @@ public class AttendanceInternalController {
 
     private static final Logger log = LoggerFactory.getLogger(AttendanceInternalController.class);
 
-    /** 勤怠記録ユースケース — ドメインロジックの実行を委譲する */
-    private final AttendanceUseCase commandService;
+    /** 打刻修正ユースケース（UC-ATT-005） */
+    private final CorrectClockUseCase correctClockUseCase;
+
+    /** 勤務実績登録ユースケース（UC-ATT-006） */
+    private final RegisterManualAttendanceUseCase registerManualAttendanceUseCase;
+
+    /** 本締め確定ユースケース（UC-ATT-007） */
+    private final FinalizeRecordUseCase finalizeRecordUseCase;
 
     /** 勤怠記録リポジトリ — レスポンス組み立てのためのレコード再取得用 */
     private final AttendanceRecordRepository attendanceRecordRepository;
 
     public AttendanceInternalController(
-            AttendanceUseCase commandService,
+            CorrectClockUseCase correctClockUseCase,
+            RegisterManualAttendanceUseCase registerManualAttendanceUseCase,
+            FinalizeRecordUseCase finalizeRecordUseCase,
             AttendanceRecordRepository attendanceRecordRepository) {
-        this.commandService = commandService;
+        this.correctClockUseCase = correctClockUseCase;
+        this.registerManualAttendanceUseCase = registerManualAttendanceUseCase;
+        this.finalizeRecordUseCase = finalizeRecordUseCase;
         this.attendanceRecordRepository = attendanceRecordRepository;
     }
 
@@ -100,8 +115,8 @@ public class AttendanceInternalController {
         ClockCorrection correction = new ClockCorrection(
                 targetType, correctedTime, request.reason(), approvalId);
 
-        // アプリケーションサービスを呼び出す（修正 → 必要に応じて再計算 → 保存）
-        commandService.correctClock(attendanceId, correction);
+        // 打刻修正ユースケースを実行する（修正 → 必要に応じて再計算 → 保存）
+        correctClockUseCase.execute(new CorrectClockCommand(attendanceId, correction));
 
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
@@ -163,9 +178,9 @@ public class AttendanceInternalController {
         ManualAttendance manual = new ManualAttendance(
                 startTime, endTime, attendanceType, request.reason(), approvalId);
 
-        // アプリケーションサービスを呼び出す（手動登録 → 勤務時間計算 → 保存）
-        AttendanceRecordId attendanceId = commandService.registerManualAttendance(
-                employeeId, workDate, manual, shiftPatternId);
+        // 手動勤務登録ユースケースを実行する（手動登録 → 勤務時間計算 → 保存）
+        AttendanceRecordId attendanceId = registerManualAttendanceUseCase.execute(
+                new RegisterManualAttendanceCommand(employeeId, workDate, manual, shiftPatternId));
 
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
@@ -213,8 +228,8 @@ public class AttendanceInternalController {
         AttendanceRecordId attendanceId = AttendanceRecordId.of(request.attendanceId());
         MonthlyClosingId monthlyClosingId = MonthlyClosingId.of(request.monthlyClosingId());
 
-        // アプリケーションサービスを呼び出す（CLOCKED_OUT→FINALIZED → 保存）
-        commandService.finalizeRecord(attendanceId, monthlyClosingId);
+        // 本締め確定ユースケースを実行する（CLOCKED_OUT→FINALIZED → 保存）
+        finalizeRecordUseCase.execute(new FinalizeRecordCommand(attendanceId, monthlyClosingId));
 
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);

@@ -14,7 +14,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.kintai.attendance.application.command.AttendanceUseCase;
+import com.example.kintai.attendance.application.command.ClockInCommand;
+import com.example.kintai.attendance.application.command.ClockInUseCase;
+import com.example.kintai.attendance.application.command.ClockOutCommand;
+import com.example.kintai.attendance.application.command.ClockOutUseCase;
+import com.example.kintai.attendance.application.command.EndBreakCommand;
+import com.example.kintai.attendance.application.command.EndBreakUseCase;
+import com.example.kintai.attendance.application.command.StartBreakCommand;
+import com.example.kintai.attendance.application.command.StartBreakUseCase;
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
 import com.example.kintai.attendance.domain.model.ClockEntry;
 import com.example.kintai.attendance.domain.model.ClockSource;
@@ -66,16 +73,31 @@ public class AttendanceCommandController {
     /** タイムゾーン: Asia/Tokyo（打刻時刻から勤務日を算出するために使用） */
     private static final ZoneId ZONE_TOKYO = ZoneId.of("Asia/Tokyo");
 
-    /** 勤怠記録ユースケース — ドメインロジックの実行を委譲する */
-    private final AttendanceUseCase commandService;
+    /** 出勤打刻ユースケース（UC-ATT-001） */
+    private final ClockInUseCase clockInUseCase;
+
+    /** 退勤打刻ユースケース（UC-ATT-002） */
+    private final ClockOutUseCase clockOutUseCase;
+
+    /** 休憩開始ユースケース（UC-ATT-003） */
+    private final StartBreakUseCase startBreakUseCase;
+
+    /** 休憩終了ユースケース（UC-ATT-004） */
+    private final EndBreakUseCase endBreakUseCase;
 
     /** 勤怠記録リポジトリ — 従業員ID+勤務日でのレコード検索・レスポンス組み立て用 */
     private final AttendanceRecordRepository attendanceRecordRepository;
 
     public AttendanceCommandController(
-            AttendanceUseCase commandService,
+            ClockInUseCase clockInUseCase,
+            ClockOutUseCase clockOutUseCase,
+            StartBreakUseCase startBreakUseCase,
+            EndBreakUseCase endBreakUseCase,
             AttendanceRecordRepository attendanceRecordRepository) {
-        this.commandService = commandService;
+        this.clockInUseCase = clockInUseCase;
+        this.clockOutUseCase = clockOutUseCase;
+        this.startBreakUseCase = startBreakUseCase;
+        this.endBreakUseCase = endBreakUseCase;
         this.attendanceRecordRepository = attendanceRecordRepository;
     }
 
@@ -104,9 +126,9 @@ public class AttendanceCommandController {
         ShiftPatternId shiftPatternId = request.shiftPatternId() != null
                 ? ShiftPatternId.of(request.shiftPatternId()) : null;
 
-        // アプリケーションサービスを呼び出す（新規作成 or 既存取得 → clockIn → 保存）
-        AttendanceRecordId attendanceId = commandService.clockIn(
-                employeeId, clockTime, source, shiftPatternId);
+        // 出勤打刻ユースケースを実行する（新規作成 or 既存取得 → clockIn → 保存）
+        AttendanceRecordId attendanceId = clockInUseCase.execute(
+                new ClockInCommand(employeeId, clockTime, source, shiftPatternId));
 
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
@@ -156,10 +178,10 @@ public class AttendanceCommandController {
         WorkDate workDate = deriveWorkDate(clockTime);
         AttendanceRecord record = findRecordByEmployeeAndDate(employeeId, workDate);
 
-        // アプリケーションサービスを呼び出す（clockOut → 勤務時間計算 → 保存）
+        // 退勤打刻ユースケースを実行する（clockOut → 勤務時間計算 → 保存）
         // 計算結果を受け取る（リポジトリはWorkDurationを永続化しないためサービスから取得）
         WorkDurationCalculator.CalculationResult calcResult =
-                commandService.clockOut(record.getId(), clockTime, source);
+                clockOutUseCase.execute(new ClockOutCommand(record.getId(), clockTime, source));
 
         // 保存後のレコードを再取得してレスポンスを組み立てる
         AttendanceRecord updated = findRecordOrThrow(record.getId());
@@ -214,8 +236,8 @@ public class AttendanceCommandController {
         WorkDate workDate = deriveWorkDate(clockTime);
         AttendanceRecord record = findRecordByEmployeeAndDate(employeeId, workDate);
 
-        // アプリケーションサービスを呼び出す（startBreak → 保存）
-        commandService.startBreak(record.getId(), clockTime, source);
+        // 休憩開始ユースケースを実行する（startBreak → 保存）
+        startBreakUseCase.execute(new StartBreakCommand(record.getId(), clockTime, source));
 
         // 保存後のレコードを再取得してレスポンスを組み立てる
         AttendanceRecord updated = findRecordOrThrow(record.getId());
@@ -262,8 +284,8 @@ public class AttendanceCommandController {
         WorkDate workDate = deriveWorkDate(clockTime);
         AttendanceRecord record = findRecordByEmployeeAndDate(employeeId, workDate);
 
-        // アプリケーションサービスを呼び出す（endBreak → 保存）
-        commandService.endBreak(record.getId(), clockTime, source);
+        // 休憩終了ユースケースを実行する（endBreak → 保存）
+        endBreakUseCase.execute(new EndBreakCommand(record.getId(), clockTime, source));
 
         // 保存後のレコードを再取得してレスポンスを組み立てる
         AttendanceRecord updated = findRecordOrThrow(record.getId());

@@ -1,7 +1,14 @@
 package com.example.kintai.attendance.presentation.controller;
 
-import com.example.kintai.attendance.application.command.WeeklyScheduleUseCase;
-import com.example.kintai.attendance.application.command.WeeklyScheduleUseCase.AssignResult;
+import com.example.kintai.attendance.application.command.AssignScheduleCommand;
+import com.example.kintai.attendance.application.command.AssignScheduleResult;
+import com.example.kintai.attendance.application.command.AssignScheduleUseCase;
+import com.example.kintai.attendance.application.command.ChangeScheduleCommand;
+import com.example.kintai.attendance.application.command.ChangeScheduleUseCase;
+import com.example.kintai.attendance.application.command.PublishScheduleCommand;
+import com.example.kintai.attendance.application.command.PublishScheduleUseCase;
+import com.example.kintai.attendance.application.command.UnpublishScheduleCommand;
+import com.example.kintai.attendance.application.command.UnpublishScheduleUseCase;
 import com.example.kintai.attendance.application.query.WeeklyScheduleQueryService;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
@@ -66,8 +73,17 @@ public class WeeklyScheduleController {
 
     private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleController.class);
 
-    /** 週次スケジュールユースケース — 書き込みユースケースの実行を委譲する */
-    private final WeeklyScheduleUseCase commandService;
+    /** スケジュール割当ユースケース（UC-SH-004） */
+    private final AssignScheduleUseCase assignScheduleUseCase;
+
+    /** スケジュール変更ユースケース（UC-SH-005） */
+    private final ChangeScheduleUseCase changeScheduleUseCase;
+
+    /** スケジュール公開ユースケース（UC-SH-006） */
+    private final PublishScheduleUseCase publishScheduleUseCase;
+
+    /** スケジュール非公開ユースケース（UC-SH-007） */
+    private final UnpublishScheduleUseCase unpublishScheduleUseCase;
 
     /** 週次スケジュールクエリサービス — 読み取りユースケースの実行を委譲する */
     private final WeeklyScheduleQueryService queryService;
@@ -76,11 +92,17 @@ public class WeeklyScheduleController {
     private final EmployeeAuthRepository employeeRepository;
 
     public WeeklyScheduleController(
-            WeeklyScheduleUseCase commandService,
+            AssignScheduleUseCase assignScheduleUseCase,
+            ChangeScheduleUseCase changeScheduleUseCase,
+            PublishScheduleUseCase publishScheduleUseCase,
+            UnpublishScheduleUseCase unpublishScheduleUseCase,
             WeeklyScheduleQueryService queryService,
             EmployeeAuthRepository employeeRepository
     ) {
-        this.commandService = commandService;
+        this.assignScheduleUseCase = assignScheduleUseCase;
+        this.changeScheduleUseCase = changeScheduleUseCase;
+        this.publishScheduleUseCase = publishScheduleUseCase;
+        this.unpublishScheduleUseCase = unpublishScheduleUseCase;
         this.queryService = queryService;
         this.employeeRepository = employeeRepository;
     }
@@ -114,12 +136,12 @@ public class WeeklyScheduleController {
         // リクエストの曜日文字列→DayOfWeek、UUID→ShiftPatternId に変換する
         Map<DayOfWeek, ShiftPatternId> assignments = parseAssignments(request.assignments());
 
-        // コマンドサービスで割当を実行する（DRAFT状態で作成される）
-        AssignResult result = commandService.assignSchedule(
+        // スケジュール割当ユースケースを実行する（DRAFT状態で作成される）
+        AssignScheduleResult result = assignScheduleUseCase.execute(new AssignScheduleCommand(
                 EmployeeId.of(request.employeeId()),
                 request.weekStartDate(),
                 assignments
-        );
+        ));
 
         // Write Modelから直接レスポンスを構築する（AFTER_COMMITプロジェクターのタイミング問題を回避）
         log.debug("スケジュール割当完了: scheduleId={}", result.schedule().getId().value());
@@ -157,8 +179,9 @@ public class WeeklyScheduleController {
         // リクエストの曜日文字列→DayOfWeek、UUID→ShiftPatternId に変換する
         Map<DayOfWeek, ShiftPatternId> assignments = parseAssignments(request.assignments());
 
-        // コマンドサービスで変更を実行する（PUBLISHEDの場合はDRAFTに戻る）
-        AssignResult result = commandService.changeSchedule(ScheduleId.of(scheduleId), assignments);
+        // スケジュール変更ユースケースを実行する（PUBLISHEDの場合はDRAFTに戻る）
+        AssignScheduleResult result = changeScheduleUseCase.execute(
+                new ChangeScheduleCommand(ScheduleId.of(scheduleId), assignments));
 
         // Write Modelから直接レスポンスを構築する（AFTER_COMMITプロジェクターのタイミング問題を回避）
         log.debug("スケジュール変更完了: scheduleId={}", scheduleId);
@@ -187,8 +210,9 @@ public class WeeklyScheduleController {
     public ResponseEntity<ScheduleResponse> publishSchedule(@PathVariable UUID scheduleId) {
         log.debug("スケジュール公開リクエスト受信: scheduleId={}", scheduleId);
 
-        // コマンドサービスで公開を実行する（DRAFT→PUBLISHED）
-        WeeklySchedule schedule = commandService.publishSchedule(ScheduleId.of(scheduleId));
+        // スケジュール公開ユースケースを実行する（DRAFT→PUBLISHED）
+        WeeklySchedule schedule = publishScheduleUseCase.execute(
+                new PublishScheduleCommand(ScheduleId.of(scheduleId)));
 
         // Write Modelから直接レスポンスを構築する（パターン名なし — 公開はステータス変更のみ）
         log.debug("スケジュール公開完了: scheduleId={}", scheduleId);
@@ -217,8 +241,9 @@ public class WeeklyScheduleController {
     public ResponseEntity<ScheduleResponse> unpublishSchedule(@PathVariable UUID scheduleId) {
         log.debug("スケジュール非公開リクエスト受信: scheduleId={}", scheduleId);
 
-        // コマンドサービスで非公開を実行する（PUBLISHED→DRAFT）
-        WeeklySchedule schedule = commandService.unpublishSchedule(ScheduleId.of(scheduleId));
+        // スケジュール非公開ユースケースを実行する（PUBLISHED→DRAFT）
+        WeeklySchedule schedule = unpublishScheduleUseCase.execute(
+                new UnpublishScheduleCommand(ScheduleId.of(scheduleId)));
 
         // Write Modelから直接レスポンスを構築する（パターン名なし — 非公開はステータス変更のみ）
         log.debug("スケジュール非公開完了: scheduleId={}", scheduleId);

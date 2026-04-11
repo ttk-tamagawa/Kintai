@@ -1,8 +1,15 @@
 package com.example.kintai.attendance.infrastructure.projector;
 
-import com.example.kintai.attendance.application.command.AttendanceUseCase;
-import com.example.kintai.attendance.application.command.ShiftPatternUseCase;
-import com.example.kintai.attendance.application.command.WeeklyScheduleUseCase;
+import com.example.kintai.attendance.application.command.AssignScheduleCommand;
+import com.example.kintai.attendance.application.command.AssignScheduleUseCase;
+import com.example.kintai.attendance.application.command.ClockInCommand;
+import com.example.kintai.attendance.application.command.ClockInUseCase;
+import com.example.kintai.attendance.application.command.ClockOutCommand;
+import com.example.kintai.attendance.application.command.ClockOutUseCase;
+import com.example.kintai.attendance.application.command.DefinePatternCommand;
+import com.example.kintai.attendance.application.command.DefinePatternUseCase;
+import com.example.kintai.attendance.application.command.PublishScheduleCommand;
+import com.example.kintai.attendance.application.command.PublishScheduleUseCase;
 import com.example.kintai.attendance.domain.model.ClockSource;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
@@ -55,13 +62,19 @@ class ProjectorIntegrationTest {
     private static final ZoneId ZONE_TOKYO = ZoneId.of("Asia/Tokyo");
 
     @Autowired
-    private AttendanceUseCase attendanceUseCase;
+    private ClockInUseCase clockInUseCase;
 
     @Autowired
-    private ShiftPatternUseCase shiftPatternUseCase;
+    private ClockOutUseCase clockOutUseCase;
 
     @Autowired
-    private WeeklyScheduleUseCase weeklyScheduleUseCase;
+    private DefinePatternUseCase definePatternUseCase;
+
+    @Autowired
+    private AssignScheduleUseCase assignScheduleUseCase;
+
+    @Autowired
+    private PublishScheduleUseCase publishScheduleUseCase;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -98,8 +111,8 @@ class ProjectorIntegrationTest {
             ClockTime clockInTime = new ClockTime(clockInInstant);
 
             // 出勤打刻を実行する（サービス経由で集約保存+イベント発行+プロジェクター実行）
-            AttendanceRecordId attendanceId = attendanceUseCase.clockIn(
-                    employeeId, clockInTime, ClockSource.WEB, null
+            AttendanceRecordId attendanceId = clockInUseCase.execute(
+                    new ClockInCommand(employeeId, clockInTime, ClockSource.WEB, null)
             );
 
             // attendance_summariesから該当行を取得して検証する
@@ -152,8 +165,8 @@ class ProjectorIntegrationTest {
                     .toInstant();
             ClockTime clockInTime = new ClockTime(clockInInstant);
 
-            AttendanceRecordId attendanceId = attendanceUseCase.clockIn(
-                    employeeId, clockInTime, ClockSource.WEB, null
+            AttendanceRecordId attendanceId = clockInUseCase.execute(
+                    new ClockInCommand(employeeId, clockInTime, ClockSource.WEB, null)
             );
 
             // 本日18:00（JST）に退勤する（9時間勤務）
@@ -162,7 +175,7 @@ class ProjectorIntegrationTest {
                     .toInstant();
             ClockTime clockOutTime = new ClockTime(clockOutInstant);
 
-            attendanceUseCase.clockOut(attendanceId, clockOutTime, ClockSource.WEB);
+            clockOutUseCase.execute(new ClockOutCommand(attendanceId, clockOutTime, ClockSource.WEB));
 
             // attendance_summariesから該当行を取得して検証する
             Map<String, Object> summary = jdbcTemplate.queryForMap(
@@ -223,21 +236,21 @@ class ProjectorIntegrationTest {
         @DisplayName("シフト割当 → weekly_schedule_summariesにDRAFTステータスとパターン名が作成される")
         void assignSchedule_createsWeeklyScheduleSummaryWithDraftStatus() {
             // テスト用のシフトパターンを2つ作成する（早番・遅番）
-            ShiftPatternId earlyPatternId = shiftPatternUseCase.definePattern(
+            ShiftPatternId earlyPatternId = definePatternUseCase.execute(new DefinePatternCommand(
                     "早番_" + UUID.randomUUID().toString().substring(0, 4),
                     LocalTime.of(8, 0),   // 8:00開始
                     LocalTime.of(17, 0),  // 17:00終了
                     60,                    // 休憩60分
                     false                  // 夜勤なし
-            );
+            ));
 
-            ShiftPatternId latePatternId = shiftPatternUseCase.definePattern(
+            ShiftPatternId latePatternId = definePatternUseCase.execute(new DefinePatternCommand(
                     "遅番_" + UUID.randomUUID().toString().substring(0, 4),
                     LocalTime.of(13, 0),  // 13:00開始
                     LocalTime.of(22, 0),  // 22:00終了
                     60,                    // 休憩60分
                     false                  // 夜勤なし
-            );
+            ));
 
             // テスト用のユニークな従業員IDを生成する
             EmployeeId employeeId = EmployeeId.of(UUID.randomUUID());
@@ -255,8 +268,8 @@ class ProjectorIntegrationTest {
             );
 
             // スケジュールを割り当てる（DRAFT状態で作成される）
-            ScheduleId scheduleId = weeklyScheduleUseCase.assignSchedule(
-                    employeeId, weekStartDate, assignments
+            ScheduleId scheduleId = assignScheduleUseCase.execute(
+                    new AssignScheduleCommand(employeeId, weekStartDate, assignments)
             ).schedule().getId();
 
             // weekly_schedule_summariesから該当行を取得して検証する
@@ -313,13 +326,13 @@ class ProjectorIntegrationTest {
         @DisplayName("シフト割当＋公開 → weekly_schedule_summariesのステータスがPUBLISHEDに更新される")
         void assignAndPublish_updatesStatusToPublished() {
             // テスト用のシフトパターンを1つ作成する
-            ShiftPatternId patternId = shiftPatternUseCase.definePattern(
+            ShiftPatternId patternId = definePatternUseCase.execute(new DefinePatternCommand(
                     "日勤_" + UUID.randomUUID().toString().substring(0, 4),
                     LocalTime.of(9, 0),   // 9:00開始
                     LocalTime.of(18, 0),  // 18:00終了
                     60,                    // 休憩60分
                     false                  // 夜勤なし
-            );
+            ));
 
             // テスト用のユニークな従業員IDを生成する
             EmployeeId employeeId = EmployeeId.of(UUID.randomUUID());
@@ -335,8 +348,8 @@ class ProjectorIntegrationTest {
             );
 
             // Step 1: スケジュールを割り当てる（DRAFT状態）
-            ScheduleId scheduleId = weeklyScheduleUseCase.assignSchedule(
-                    employeeId, weekStartDate, assignments
+            ScheduleId scheduleId = assignScheduleUseCase.execute(
+                    new AssignScheduleCommand(employeeId, weekStartDate, assignments)
             ).schedule().getId();
 
             // DRAFT状態であることを確認する
@@ -348,7 +361,7 @@ class ProjectorIntegrationTest {
                     "公開前のステータスはDRAFTであるべき");
 
             // Step 2: スケジュールを公開する（DRAFT→PUBLISHED）
-            weeklyScheduleUseCase.publishSchedule(scheduleId);
+            publishScheduleUseCase.execute(new PublishScheduleCommand(scheduleId));
 
             // weekly_schedule_summariesから該当行を取得して検証する
             Map<String, Object> publishedSummary = jdbcTemplate.queryForMap(
