@@ -9,7 +9,10 @@ import com.example.kintai.attendance.application.command.PublishScheduleCommand;
 import com.example.kintai.attendance.application.command.PublishScheduleUseCase;
 import com.example.kintai.attendance.application.command.UnpublishScheduleCommand;
 import com.example.kintai.attendance.application.command.UnpublishScheduleUseCase;
-import com.example.kintai.attendance.application.query.WeeklyScheduleQueryService;
+import com.example.kintai.attendance.application.query.GetScheduleQuery;
+import com.example.kintai.attendance.application.query.GetScheduleQueryService;
+import com.example.kintai.attendance.application.query.GetSchedulesQuery;
+import com.example.kintai.attendance.application.query.GetSchedulesQueryService;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
 import com.example.kintai.attendance.presentation.dto.AssignScheduleRequest;
@@ -85,8 +88,11 @@ public class WeeklyScheduleController {
     /** スケジュール非公開ユースケース（UC-SH-007） */
     private final UnpublishScheduleUseCase unpublishScheduleUseCase;
 
-    /** 週次スケジュールクエリサービス — 読み取りユースケースの実行を委譲する */
-    private final WeeklyScheduleQueryService queryService;
+    /** スケジュール一覧取得（UC-SH-Q03） */
+    private final GetSchedulesQueryService getSchedulesQueryService;
+
+    /** スケジュール詳細取得（UC-SH-Q04） */
+    private final GetScheduleQueryService getScheduleQueryService;
 
     /** 従業員リポジトリ — コマンドレスポンスで従業員名を取得するために使用する */
     private final EmployeeAuthRepository employeeRepository;
@@ -96,14 +102,16 @@ public class WeeklyScheduleController {
             ChangeScheduleUseCase changeScheduleUseCase,
             PublishScheduleUseCase publishScheduleUseCase,
             UnpublishScheduleUseCase unpublishScheduleUseCase,
-            WeeklyScheduleQueryService queryService,
+            GetSchedulesQueryService getSchedulesQueryService,
+            GetScheduleQueryService getScheduleQueryService,
             EmployeeAuthRepository employeeRepository
     ) {
         this.assignScheduleUseCase = assignScheduleUseCase;
         this.changeScheduleUseCase = changeScheduleUseCase;
         this.publishScheduleUseCase = publishScheduleUseCase;
         this.unpublishScheduleUseCase = unpublishScheduleUseCase;
-        this.queryService = queryService;
+        this.getSchedulesQueryService = getSchedulesQueryService;
+        this.getScheduleQueryService = getScheduleQueryService;
         this.employeeRepository = employeeRepository;
     }
 
@@ -276,7 +284,8 @@ public class WeeklyScheduleController {
         log.debug("スケジュール一覧リクエスト受信: employeeId={}, weekFrom={}, weekTo={}", employeeId, weekFrom, weekTo);
 
         // クエリサービスでスケジュール一覧を取得する（employeeId=nullの場合は全件、weekFrom/weekToはサービス側でデフォルト値を設定）
-        List<ScheduleSummary> schedules = queryService.getSchedules(employeeId, weekFrom, weekTo);
+        List<ScheduleSummary> schedules = getSchedulesQueryService.execute(
+                new GetSchedulesQuery(employeeId, weekFrom, weekTo));
 
         // ScheduleSummary → ScheduleResponse に変換する
         List<ScheduleResponse> response = schedules.stream()
@@ -303,7 +312,7 @@ public class WeeklyScheduleController {
         log.debug("スケジュール詳細リクエスト受信: scheduleId={}", scheduleId);
 
         // クエリサービスでスケジュール詳細を取得する（見つからなければ404）
-        ScheduleSummary summary = queryService.getSchedule(scheduleId);
+        ScheduleSummary summary = getScheduleQueryService.execute(new GetScheduleQuery(scheduleId));
 
         log.debug("スケジュール詳細取得完了: employeeId={}, weekStartDate={}",
                 summary.employeeId(), summary.weekStartDate());

@@ -15,14 +15,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.kintai.attendance.application.query.AttendanceQueryService;
-import com.example.kintai.attendance.application.query.AttendanceQueryService.DepartmentDashboardKpi;
-import com.example.kintai.attendance.application.query.AttendanceQueryService.DepartmentDashboardResult;
-import com.example.kintai.attendance.application.query.AttendanceQueryService.DepartmentDashboardRow;
-import com.example.kintai.attendance.application.query.AttendanceQueryService.MonthlySummaryKpi;
-import com.example.kintai.attendance.application.query.AttendanceQueryService.MonthlySummaryResult;
-import com.example.kintai.attendance.application.query.AttendanceQueryService.MonthlySummaryRow;
-import com.example.kintai.attendance.application.query.AttendanceQueryService.TodayAttendanceResult;
+import com.example.kintai.attendance.application.query.DepartmentDashboardKpi;
+import com.example.kintai.attendance.application.query.DepartmentDashboardResult;
+import com.example.kintai.attendance.application.query.DepartmentDashboardRow;
+import com.example.kintai.attendance.application.query.MonthlySummaryKpi;
+import com.example.kintai.attendance.application.query.MonthlySummaryResult;
+import com.example.kintai.attendance.application.query.MonthlySummaryRow;
+import com.example.kintai.attendance.application.query.ExportDepartmentDashboardQuery;
+import com.example.kintai.attendance.application.query.ExportDepartmentDashboardQueryService;
+import com.example.kintai.attendance.application.query.ExportMonthlySummaryQuery;
+import com.example.kintai.attendance.application.query.ExportMonthlySummaryQueryService;
+import com.example.kintai.attendance.application.query.GetDailyAttendancesQuery;
+import com.example.kintai.attendance.application.query.GetDailyAttendancesQueryService;
+import com.example.kintai.attendance.application.query.GetDepartmentDashboardQuery;
+import com.example.kintai.attendance.application.query.GetDepartmentDashboardQueryService;
+import com.example.kintai.attendance.application.query.GetMonthlySummaryQuery;
+import com.example.kintai.attendance.application.query.GetMonthlySummaryQueryService;
+import com.example.kintai.attendance.application.query.GetTodayAttendanceQuery;
+import com.example.kintai.attendance.application.query.GetTodayAttendanceQueryService;
+import com.example.kintai.attendance.application.query.TodayAttendanceResult;
 import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DailySummary;
 import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.PageResult;
 import com.example.kintai.attendance.presentation.dto.DailyAttendancePageResponse;
@@ -63,11 +74,38 @@ public class AttendanceQueryController {
 
     private static final Logger log = LoggerFactory.getLogger(AttendanceQueryController.class);
 
-    /** 勤怠記録クエリサービス — Read Modelからのデータ取得を委譲する */
-    private final AttendanceQueryService queryService;
+    /** 当日勤怠ステータス取得（UC-ATT-Q01） */
+    private final GetTodayAttendanceQueryService getTodayAttendanceQueryService;
 
-    public AttendanceQueryController(AttendanceQueryService queryService) {
-        this.queryService = queryService;
+    /** 日次勤怠一覧取得（UC-ATT-Q02） */
+    private final GetDailyAttendancesQueryService getDailyAttendancesQueryService;
+
+    /** 月次サマリー取得（UC-ATT-Q03） */
+    private final GetMonthlySummaryQueryService getMonthlySummaryQueryService;
+
+    /** 月次サマリーCSV出力（UC-ATT-Q04） */
+    private final ExportMonthlySummaryQueryService exportMonthlySummaryQueryService;
+
+    /** 部門ダッシュボード取得（UC-ATT-Q05） */
+    private final GetDepartmentDashboardQueryService getDepartmentDashboardQueryService;
+
+    /** 部門ダッシュボードCSV出力（UC-ATT-Q06） */
+    private final ExportDepartmentDashboardQueryService exportDepartmentDashboardQueryService;
+
+    public AttendanceQueryController(
+            GetTodayAttendanceQueryService getTodayAttendanceQueryService,
+            GetDailyAttendancesQueryService getDailyAttendancesQueryService,
+            GetMonthlySummaryQueryService getMonthlySummaryQueryService,
+            ExportMonthlySummaryQueryService exportMonthlySummaryQueryService,
+            GetDepartmentDashboardQueryService getDepartmentDashboardQueryService,
+            ExportDepartmentDashboardQueryService exportDepartmentDashboardQueryService
+    ) {
+        this.getTodayAttendanceQueryService = getTodayAttendanceQueryService;
+        this.getDailyAttendancesQueryService = getDailyAttendancesQueryService;
+        this.getMonthlySummaryQueryService = getMonthlySummaryQueryService;
+        this.exportMonthlySummaryQueryService = exportMonthlySummaryQueryService;
+        this.getDepartmentDashboardQueryService = getDepartmentDashboardQueryService;
+        this.exportDepartmentDashboardQueryService = exportDepartmentDashboardQueryService;
     }
 
     // ========================================
@@ -90,8 +128,8 @@ public class AttendanceQueryController {
 
         log.debug("当日勤怠取得リクエスト受信: employeeId={}", employeeId);
 
-        // クエリサービスで当日の勤怠を取得する
-        return queryService.getTodayAttendance(EmployeeId.of(employeeId))
+        // 当日勤怠ステータス取得クエリを実行する
+        return getTodayAttendanceQueryService.execute(new GetTodayAttendanceQuery(EmployeeId.of(employeeId)))
                 .map(result -> {
                     // サービス結果をレスポンスDTOに変換する
                     TodayAttendanceResponse response = toTodayAttendanceResponse(result);
@@ -139,9 +177,9 @@ public class AttendanceQueryController {
 
         log.debug("日次勤怠一覧リクエスト受信: employeeId={}, from={}, to={}", employeeId, dateFrom, dateTo);
 
-        // クエリサービスでページネーション付き日次サマリーを取得する
-        PageResult<DailySummary> result = queryService.getDailyAttendances(
-                EmployeeId.of(employeeId), dateFrom, dateTo, status, page, size, sortField, sortDirection);
+        // 日次勤怠一覧取得クエリを実行する
+        PageResult<DailySummary> result = getDailyAttendancesQueryService.execute(
+                new GetDailyAttendancesQuery(EmployeeId.of(employeeId), dateFrom, dateTo, status, page, size, sortField, sortDirection));
 
         // サービス結果をレスポンスDTOに変換する
         DailyAttendancePageResponse response = toDailyAttendancePageResponse(result);
@@ -187,9 +225,9 @@ public class AttendanceQueryController {
 
         log.debug("月次サマリーリクエスト受信: departmentId={}, year={}, month={}", departmentId, y, m);
 
-        // クエリサービスで月次サマリーを取得する
-        MonthlySummaryResult result = queryService.getMonthlySummary(
-                departmentId, y, m, page, size, sortField, sortDirection);
+        // 月次サマリー取得クエリを実行する
+        MonthlySummaryResult result = getMonthlySummaryQueryService.execute(
+                new GetMonthlySummaryQuery(departmentId, y, m, page, size, sortField, sortDirection));
 
         // サービス結果をレスポンスDTOに変換する
         MonthlySummaryResponse response = toMonthlySummaryResponse(result);
@@ -227,8 +265,9 @@ public class AttendanceQueryController {
 
         log.debug("月次サマリーCSVエクスポート: departmentId={}, year={}, month={}", departmentId, y, m);
 
-        // クエリサービスでCSVバイト配列を生成する
-        byte[] csvBytes = queryService.exportMonthlySummary(departmentId, y, m);
+        // 月次サマリーCSV出力クエリを実行する
+        byte[] csvBytes = exportMonthlySummaryQueryService.execute(
+                new ExportMonthlySummaryQuery(departmentId, y, m));
 
         // CSVファイル名を生成する（例: monthly_summary_2026_02.csv）
         String filename = String.format("monthly_summary_%04d_%02d.csv", y, m);
@@ -277,9 +316,9 @@ public class AttendanceQueryController {
 
         log.debug("部門ダッシュボードリクエスト受信: departmentId={}, year={}, month={}", departmentId, y, m);
 
-        // クエリサービスで部門ダッシュボードを取得する
-        DepartmentDashboardResult result = queryService.getDepartmentDashboard(
-                departmentId, y, m, page, size, sortField, sortDirection);
+        // 部門ダッシュボード取得クエリを実行する
+        DepartmentDashboardResult result = getDepartmentDashboardQueryService.execute(
+                new GetDepartmentDashboardQuery(departmentId, y, m, page, size, sortField, sortDirection));
 
         // サービス結果をレスポンスDTOに変換する
         DepartmentDashboardResponse response = toDepartmentDashboardResponse(result);
@@ -317,8 +356,9 @@ public class AttendanceQueryController {
 
         log.debug("部門ダッシュボードCSVエクスポート: departmentId={}, year={}, month={}", departmentId, y, m);
 
-        // クエリサービスでCSVバイト配列を生成する
-        byte[] csvBytes = queryService.exportDepartmentDashboard(departmentId, y, m);
+        // 部門ダッシュボードCSV出力クエリを実行する
+        byte[] csvBytes = exportDepartmentDashboardQueryService.execute(
+                new ExportDepartmentDashboardQuery(departmentId, y, m));
 
         // CSVファイル名を生成する（例: department_dashboard_2026_02.csv）
         String filename = String.format("department_dashboard_%04d_%02d.csv", y, m);
