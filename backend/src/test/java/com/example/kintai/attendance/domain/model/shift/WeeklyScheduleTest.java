@@ -1,7 +1,9 @@
 package com.example.kintai.attendance.domain.model.shift;
 
+import com.example.kintai.attendance.domain.model.shift.event.*;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -128,6 +130,12 @@ class WeeklyScheduleTest {
             assertEquals(0, schedule.getVersion(), "初期バージョンは0であること");
             assertNotNull(schedule.getCreatedAt(), "作成日時が設定されていること");
             assertNotNull(schedule.getUpdatedAt(), "更新日時が設定されていること");
+
+            // ドメインイベントの検証: ShiftAssignedEvent が登録されていること
+            assertEquals(1, schedule.getDomainEvents().size(),
+                    "ドメインイベントが1件登録されること");
+            assertInstanceOf(ShiftAssignedEvent.class, schedule.getDomainEvents().getFirst(),
+                    "ShiftAssignedEvent が登録されること");
         }
 
         @Test
@@ -272,6 +280,11 @@ class WeeklyScheduleTest {
                     schedule.getStatus(),
                     "PUBLISHED状態で変更後はDRAFTに戻ること"
             );
+
+            // ドメインイベントの検証: ShiftChangedEvent が登録されていること
+            assertTrue(schedule.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof ShiftChangedEvent),
+                    "ShiftChangedEvent が登録されること");
         }
 
         @Test
@@ -354,6 +367,11 @@ class WeeklyScheduleTest {
                     schedule.getStatus(),
                     "公開後はPUBLISHEDに遷移していること"
             );
+
+            // ドメインイベントの検証: SchedulePublishedEvent が登録されていること
+            assertTrue(schedule.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof SchedulePublishedEvent),
+                    "SchedulePublishedEvent が登録されること");
         }
 
         @Test
@@ -402,6 +420,11 @@ class WeeklyScheduleTest {
                     schedule.getStatus(),
                     "非公開後はDRAFTに遷移していること"
             );
+
+            // ドメインイベントの検証: ScheduleUnpublishedEvent が登録されていること
+            assertTrue(schedule.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof ScheduleUnpublishedEvent),
+                    "ScheduleUnpublishedEvent が登録されること");
         }
 
         @Test

@@ -1,5 +1,6 @@
 package com.example.kintai.attendance.domain.model.shift;
 
+import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternDefinedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -70,6 +71,12 @@ class ShiftPatternTest {
 
             // 検証: 初期状態でACTIVEであること
             assertTrue(pattern.isActive());
+
+            // ドメインイベントの検証: ShiftPatternDefinedEvent が登録されていること
+            assertEquals(1, pattern.getDomainEvents().size(),
+                    "ドメインイベントが1件登録されること");
+            assertInstanceOf(ShiftPatternDefinedEvent.class, pattern.getDomainEvents().getFirst(),
+                    "ShiftPatternDefinedEvent が登録されること");
         }
 
         @Test

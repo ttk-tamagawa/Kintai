@@ -1,10 +1,12 @@
 package com.example.kintai.attendance.domain.model;
 
+import com.example.kintai.attendance.domain.model.event.*;
 import com.example.kintai.shared.domain.model.ApprovalId;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.MonthlyClosingId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -211,6 +213,12 @@ class AttendanceRecordTest {
             assertEquals(ClockType.CLOCK_IN, entry.type(), "打刻種別がCLOCK_INであること");
             assertEquals(clockInTime, entry.time(), "打刻時刻が正しいこと");
             assertEquals(ClockSource.WEB, entry.source(), "打刻元がWEBであること");
+
+            // ドメインイベントの検証: ClockedInEvent が登録されていること
+            List<DomainEvent> events = record.getDomainEvents();
+            assertEquals(1, events.size(), "ドメインイベントが1件登録されること");
+            assertInstanceOf(ClockedInEvent.class, events.getFirst(),
+                    "ClockedInEvent が登録されること");
         }
 
         @Test
@@ -294,6 +302,12 @@ class AttendanceRecordTest {
             assertEquals(ClockType.CLOCK_OUT, clockOutEntry.type(), "打刻種別がCLOCK_OUTであること");
             assertEquals(clockOutTime, clockOutEntry.time(), "打刻時刻が正しいこと");
             assertEquals(ClockSource.WEB, clockOutEntry.source(), "打刻元がWEBであること");
+
+            // ドメインイベントの検証: ClockedInEvent + ClockedOutEvent が登録されていること
+            List<DomainEvent> events = record.getDomainEvents();
+            assertTrue(events.size() >= 2, "ドメインイベントが2件以上登録されること");
+            assertInstanceOf(ClockedOutEvent.class, events.get(1),
+                    "2件目に ClockedOutEvent が登録されること");
         }
 
         @Test
@@ -399,6 +413,11 @@ class AttendanceRecordTest {
 
             // 休憩中フラグの検証
             assertTrue(record.isOnBreak(), "休憩中であること");
+
+            // ドメインイベントの検証: BreakStartedEvent が登録されていること
+            assertTrue(record.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof BreakStartedEvent),
+                    "BreakStartedEvent が登録されること");
         }
 
         @Test
@@ -520,6 +539,11 @@ class AttendanceRecordTest {
 
             // 休憩中フラグの検証
             assertFalse(record.isOnBreak(), "休憩中でないこと");
+
+            // ドメインイベントの検証: BreakEndedEvent が登録されていること
+            assertTrue(record.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof BreakEndedEvent),
+                    "BreakEndedEvent が登録されること");
         }
 
         @Test
@@ -696,6 +720,11 @@ class AttendanceRecordTest {
 
             // 出勤 + 退勤 + 修正の3件
             assertEquals(3, record.getClockEntries().size(), "修正エントリが追加されること");
+
+            // ドメインイベントの検証: ClockCorrectedEvent が登録されていること
+            assertTrue(record.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof ClockCorrectedEvent),
+                    "ClockCorrectedEvent が登録されること");
         }
 
         @Test
@@ -757,6 +786,11 @@ class AttendanceRecordTest {
             assertEquals(ClockType.CLOCK_OUT, clockOutEntry.type(), "2件目がCLOCK_OUTであること");
             assertEquals(endTime, clockOutEntry.time(), "退勤時刻が正しいこと");
             assertEquals(ClockSource.MANUAL, clockOutEntry.source(), "打刻元がMANUALであること");
+
+            // ドメインイベントの検証: ManualAttendanceRegisteredEvent が登録されていること
+            assertTrue(record.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof ManualAttendanceRegisteredEvent),
+                    "ManualAttendanceRegisteredEvent が登録されること");
         }
 
         @Test
@@ -866,6 +900,11 @@ class AttendanceRecordTest {
             // 状態遷移の検証: CLOCKED_OUT → FINALIZED
             assertEquals(AttendanceStatus.FINALIZED, record.getStatus(),
                     "ステータスがFINALIZEDに遷移すること");
+
+            // ドメインイベントの検証: AttendanceFinalizedEvent が登録されていること
+            assertTrue(record.getDomainEvents().stream()
+                    .anyMatch(e -> e instanceof AttendanceFinalizedEvent),
+                    "AttendanceFinalizedEvent が登録されること");
         }
 
         @Test
