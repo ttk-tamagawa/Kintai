@@ -69,38 +69,4 @@ public class BreakTimeCalculator {
 
         return totalBreakMinutes;
     }
-
-    /**
-     * 指定したペア番号の休憩時間（分）を計算する
-     *
-     * <p>BreakEndedEvent発行時に、直近の休憩ペアの時間を取得するために使用する。</p>
-     *
-     * @param clockEntries 打刻エントリ一覧
-     * @return 最後に完了した休憩の時間（分）。休憩ペアがない場合は0
-     */
-    public int calculateLastBreakMinutes(List<ClockEntry> clockEntries) {
-        Objects.requireNonNull(clockEntries, "打刻エントリ一覧はnullにできません");
-
-        // BREAK_STARTとBREAK_ENDを抽出する
-        List<Instant> breakStarts = new ArrayList<>();
-        List<Instant> breakEnds = new ArrayList<>();
-
-        for (ClockEntry entry : clockEntries) {
-            if (entry.type() == ClockType.BREAK_START) {
-                breakStarts.add(entry.time().value());
-            } else if (entry.type() == ClockType.BREAK_END) {
-                breakEnds.add(entry.time().value());
-            }
-        }
-
-        // 完了した休憩ペアがなければ0を返す
-        if (breakEnds.isEmpty()) {
-            return 0;
-        }
-
-        // 最後のペアの時間差を返す
-        int lastIndex = breakEnds.size() - 1;
-        long minutes = Duration.between(breakStarts.get(lastIndex), breakEnds.get(lastIndex)).toMinutes();
-        return (int) minutes;
-    }
 }

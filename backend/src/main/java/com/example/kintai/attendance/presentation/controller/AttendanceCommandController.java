@@ -1,9 +1,6 @@
 package com.example.kintai.attendance.presentation.controller;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,12 +20,12 @@ import com.example.kintai.attendance.application.command.EndBreakUseCase;
 import com.example.kintai.attendance.application.command.StartBreakCommand;
 import com.example.kintai.attendance.application.command.StartBreakUseCase;
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
-import com.example.kintai.attendance.domain.model.ClockEntry;
 import com.example.kintai.attendance.domain.model.ClockSource;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.attendance.domain.model.ClockType;
 import com.example.kintai.attendance.domain.model.WorkDate;
 import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
+import com.example.kintai.attendance.domain.service.BreakTimeCalculator;
 import com.example.kintai.attendance.domain.service.WorkDurationCalculator;
 import com.example.kintai.attendance.presentation.dto.BreakEndResponse;
 import com.example.kintai.attendance.presentation.dto.BreakStartResponse;
@@ -70,9 +67,6 @@ public class AttendanceCommandController {
 
     private static final Logger log = LoggerFactory.getLogger(AttendanceCommandController.class);
 
-    /** タイムゾーン: Asia/Tokyo（打刻時刻から勤務日を算出するために使用） */
-    private static final ZoneId ZONE_TOKYO = ZoneId.of("Asia/Tokyo");
-
     /** 出勤打刻ユースケース（UC-ATT-001） */
     private final ClockInUseCase clockInUseCase;
 
@@ -88,17 +82,22 @@ public class AttendanceCommandController {
     /** 勤怠記録リポジトリ — 従業員ID+勤務日でのレコード検索・レスポンス組み立て用 */
     private final AttendanceRecordRepository attendanceRecordRepository;
 
+    /** 休憩時間計算ドメインサービス — 打刻エントリから休憩時間を算出する */
+    private final BreakTimeCalculator breakTimeCalculator;
+
     public AttendanceCommandController(
             ClockInUseCase clockInUseCase,
             ClockOutUseCase clockOutUseCase,
             StartBreakUseCase startBreakUseCase,
             EndBreakUseCase endBreakUseCase,
-            AttendanceRecordRepository attendanceRecordRepository) {
+            AttendanceRecordRepository attendanceRecordRepository,
+            BreakTimeCalculator breakTimeCalculator) {
         this.clockInUseCase = clockInUseCase;
         this.clockOutUseCase = clockOutUseCase;
         this.startBreakUseCase = startBreakUseCase;
         this.endBreakUseCase = endBreakUseCase;
         this.attendanceRecordRepository = attendanceRecordRepository;
+        this.breakTimeCalculator = breakTimeCalculator;
     }
 
     // ========================================
@@ -133,8 +132,8 @@ public class AttendanceCommandController {
         // 保存後のレコードを取得してレスポンスを組み立てる
         AttendanceRecord record = findRecordOrThrow(attendanceId);
 
-        // 出勤時刻を打刻エントリから取得する
-        Instant clockInTime = findLatestTimeOfType(record.getClockEntries(), ClockType.CLOCK_IN);
+        // 出勤時刻を集約から取得する
+        Instant clockInTime = record.getLatestTimeOf(ClockType.CLOCK_IN).value();
 
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         ClockInResponse response = new ClockInResponse(
@@ -175,7 +174,7 @@ public class AttendanceCommandController {
         ClockSource source = parseClockSource(request.source());
 
         // 従業員ID+勤務日で当日の勤怠記録を検索する
-        WorkDate workDate = deriveWorkDate(clockTime);
+        WorkDate workDate = WorkDate.from(clockTime);
         AttendanceRecord record = findRecordByEmployeeAndDate(employeeId, workDate);
 
         // 退勤打刻ユースケースを実行する（clockOut → 勤務時間計算 → 保存）
@@ -186,9 +185,9 @@ public class AttendanceCommandController {
         // 保存後のレコードを再取得してレスポンスを組み立てる
         AttendanceRecord updated = findRecordOrThrow(record.getId());
 
-        // 出勤・退勤時刻を打刻エントリから取得する
-        Instant clockInTime = findLatestTimeOfType(updated.getClockEntries(), ClockType.CLOCK_IN);
-        Instant clockOutTime = findLatestTimeOfType(updated.getClockEntries(), ClockType.CLOCK_OUT);
+        // 出勤・退勤時刻を集約から取得する
+        Instant clockInTime = updated.getLatestTimeOf(ClockType.CLOCK_IN).value();
+        Instant clockOutTime = updated.getLatestTimeOf(ClockType.CLOCK_OUT).value();
 
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         ClockOutResponse response = new ClockOutResponse(
@@ -233,7 +232,7 @@ public class AttendanceCommandController {
         ClockSource source = parseClockSource(request.source());
 
         // 従業員ID+勤務日で当日の勤怠記録を検索する
-        WorkDate workDate = deriveWorkDate(clockTime);
+        WorkDate workDate = WorkDate.from(clockTime);
         AttendanceRecord record = findRecordByEmployeeAndDate(employeeId, workDate);
 
         // 休憩開始ユースケースを実行する（startBreak → 保存）
@@ -281,7 +280,7 @@ public class AttendanceCommandController {
         ClockSource source = parseClockSource(request.source());
 
         // 従業員ID+勤務日で当日の勤怠記録を検索する
-        WorkDate workDate = deriveWorkDate(clockTime);
+        WorkDate workDate = WorkDate.from(clockTime);
         AttendanceRecord record = findRecordByEmployeeAndDate(employeeId, workDate);
 
         // 休憩終了ユースケースを実行する（endBreak → 保存）
@@ -290,8 +289,8 @@ public class AttendanceCommandController {
         // 保存後のレコードを再取得してレスポンスを組み立てる
         AttendanceRecord updated = findRecordOrThrow(record.getId());
 
-        // 合計休憩時間を打刻エントリから計算する
-        int totalBreakMinutes = calculateTotalBreakMinutes(updated.getClockEntries());
+        // 合計休憩時間をドメインサービスで計算する
+        int totalBreakMinutes = breakTimeCalculator.calculateTotalBreakMinutes(updated.getClockEntries());
 
         // レスポンスDTO組み立て（EmployeeId: String→UUID変換）
         BreakEndResponse response = new BreakEndResponse(
@@ -311,16 +310,6 @@ public class AttendanceCommandController {
     // ========================================
     // ヘルパーメソッド
     // ========================================
-
-    /**
-     * 打刻時刻からAsia/Tokyoタイムゾーンで勤務日を算出する
-     *
-     * @param clockTime 打刻時刻
-     * @return 勤務日（Asia/Tokyo基準）
-     */
-    private WorkDate deriveWorkDate(ClockTime clockTime) {
-        return new WorkDate(clockTime.value().atZone(ZONE_TOKYO).toLocalDate());
-    }
 
     /**
      * 従業員ID+勤務日で勤怠記録を検索する（見つからない場合は404エラー）
@@ -368,48 +357,4 @@ public class AttendanceCommandController {
         }
     }
 
-    /**
-     * 指定種別の最新打刻時刻を取得する
-     *
-     * <p>打刻エントリ一覧を末尾から検索し、最初に見つかった指定種別の時刻を返す。</p>
-     *
-     * @param entries 打刻エントリ一覧
-     * @param type    検索する打刻種別
-     * @return 最新の打刻時刻（該当なしの場合はnull）
-     */
-    private Instant findLatestTimeOfType(List<ClockEntry> entries, ClockType type) {
-        for (int i = entries.size() - 1; i >= 0; i--) {
-            if (entries.get(i).type() == type) {
-                return entries.get(i).time().value();
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 全休憩時間の合計（分）を計算する
-     *
-     * <p>打刻エントリ一覧からBREAK_START/BREAK_ENDのペアを順番に見つけ、
-     * 各ペアの差分時間を合計する。</p>
-     *
-     * @param entries 打刻エントリ一覧
-     * @return 合計休憩時間（分）
-     */
-    private int calculateTotalBreakMinutes(List<ClockEntry> entries) {
-        int totalMinutes = 0;
-        Instant breakStart = null;
-
-        for (ClockEntry entry : entries) {
-            if (entry.type() == ClockType.BREAK_START) {
-                // 休憩開始時刻を記録する
-                breakStart = entry.time().value();
-            } else if (entry.type() == ClockType.BREAK_END && breakStart != null) {
-                // 休憩開始〜終了の差分を加算する
-                totalMinutes += (int) Duration.between(breakStart, entry.time().value()).toMinutes();
-                breakStart = null;
-            }
-        }
-
-        return totalMinutes;
-    }
 }

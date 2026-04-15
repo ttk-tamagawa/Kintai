@@ -3,7 +3,6 @@ package com.example.kintai.attendance.domain.model.shift;
 import com.example.kintai.attendance.domain.model.shift.event.*;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
-import com.example.kintai.shared.kernel.contract.DomainEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

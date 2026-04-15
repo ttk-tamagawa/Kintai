@@ -252,8 +252,8 @@ public class AttendanceRecord extends AggregateRoot {
         }
 
         // INV-ATT-001: 退勤時刻は出勤時刻より後であること
-        ClockTime clockInTime = getEffectiveClockInTime();
-        if (clockInTime != null && !time.value().isAfter(clockInTime.value())) {
+        ClockTime clockInTime = getLatestTimeOf(ClockType.CLOCK_IN);
+        if (!time.value().isAfter(clockInTime.value())) {
             throw new IllegalStateException(
                     "退勤時刻は出勤時刻より後である必要があります（INV-ATT-001）。出勤: "
                             + clockInTime.value() + ", 退勤: " + time.value()
@@ -301,8 +301,8 @@ public class AttendanceRecord extends AggregateRoot {
         }
 
         // INV-ATT-002: 休憩開始時刻は出勤時刻より後であること
-        ClockTime clockInTime = getEffectiveClockInTime();
-        if (clockInTime != null && !time.value().isAfter(clockInTime.value())) {
+        ClockTime clockInTime = getLatestTimeOf(ClockType.CLOCK_IN);
+        if (!time.value().isAfter(clockInTime.value())) {
             throw new IllegalStateException(
                     "休憩開始時刻は出勤時刻より後である必要があります（INV-ATT-002）。出勤: "
                             + clockInTime.value() + ", 休憩開始: " + time.value()
@@ -347,8 +347,8 @@ public class AttendanceRecord extends AggregateRoot {
         }
 
         // INV-ATT-002: 休憩終了時刻は休憩開始時刻より後であること
-        ClockTime breakStartTime = getLastBreakStartTime();
-        if (breakStartTime != null && !time.value().isAfter(breakStartTime.value())) {
+        ClockTime breakStartTime = getLatestTimeOf(ClockType.BREAK_START);
+        if (!time.value().isAfter(breakStartTime.value())) {
             throw new IllegalStateException(
                     "休憩終了時刻は休憩開始時刻より後である必要があります（INV-ATT-002）。休憩開始: "
                             + breakStartTime.value() + ", 休憩終了: " + time.value()
@@ -386,7 +386,7 @@ public class AttendanceRecord extends AggregateRoot {
         }
 
         // 修正前の打刻時刻を取得する（イベント記録用。修正エントリ追加前に取得する）
-        ClockTime beforeTime = getEffectiveTimeOfType(correction.targetType());
+        ClockTime beforeTime = getLatestTimeOf(correction.targetType());
 
         // 修正エントリを追加（source=CORRECTIONで新規追加。元の打刻は保持）
         clockEntries.add(new ClockEntry(
@@ -510,49 +510,22 @@ public class AttendanceRecord extends AggregateRoot {
     // ========================
 
     /**
-     * 有効な出勤時刻を取得する — 最後のCLOCK_INエントリの時刻を返す
+     * 指定された打刻種別の最新の打刻時刻を取得する
      *
-     * <p>打刻修正（CORRECTION）がある場合、最後に追加されたCLOCK_INエントリが
-     * 有効な出勤時刻となる。INV-ATT-001/002の検証に使用する。</p>
-     *
-     * @return 出勤時刻（CLOCK_INエントリがない場合はnull）
-     */
-    private ClockTime getEffectiveClockInTime() {
-        return clockEntries.stream()
-                .filter(entry -> entry.type() == ClockType.CLOCK_IN)
-                .reduce((first, second) -> second)
-                .map(ClockEntry::time)
-                .orElse(null);
-    }
-
-    /**
-     * 最後の休憩開始時刻を取得する — 最後のBREAK_STARTエントリの時刻を返す
-     *
-     * <p>INV-ATT-002の検証で、休憩終了時刻が休憩開始時刻より後であることを
-     * 確認するために使用する。</p>
-     *
-     * @return 最後の休憩開始時刻（BREAK_STARTエントリがない場合はnull）
-     */
-    private ClockTime getLastBreakStartTime() {
-        return clockEntries.stream()
-                .filter(entry -> entry.type() == ClockType.BREAK_START)
-                .reduce((first, second) -> second)
-                .map(ClockEntry::time)
-                .orElse(null);
-    }
-
-    /**
-     * 指定された打刻種別の最新の打刻時刻を取得する — 打刻修正イベントの修正前時刻の取得に使用
+     * <p>打刻エントリ一覧を末尾から検索し、最初に見つかった指定種別の時刻を返す。
+     * 打刻修正（CORRECTION）がある場合、最後に追加されたエントリが有効な時刻となる。</p>
      *
      * @param type 打刻種別
-     * @return 最新の打刻時刻（該当エントリがない場合はnull）
+     * @return 最新の打刻時刻
+     * @throws IllegalStateException 指定種別の打刻が見つからない場合
      */
-    private ClockTime getEffectiveTimeOfType(ClockType type) {
+    public ClockTime getLatestTimeOf(ClockType type) {
         return clockEntries.stream()
                 .filter(entry -> entry.type() == type)
                 .reduce((first, second) -> second)
                 .map(ClockEntry::time)
-                .orElse(null);
+                .orElseThrow(() -> new IllegalStateException(
+                        type + "の打刻が見つかりません"));
     }
 
     /**

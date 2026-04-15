@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.domain.service;
 
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
-import com.example.kintai.attendance.domain.model.ClockEntry;
 import com.example.kintai.attendance.domain.model.ClockType;
 import com.example.kintai.attendance.domain.model.OvertimeDuration;
 import com.example.kintai.attendance.domain.model.WorkDuration;
@@ -12,7 +11,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -114,17 +112,15 @@ public class WorkDurationCalculator {
     public CalculationResult calculateForFlex(AttendanceRecord record) {
         Objects.requireNonNull(record, "勤怠記録はnullにできません");
 
-        List<ClockEntry> entries = record.getClockEntries();
-
-        // 出勤・退勤時刻を取得する
-        Instant clockInTime = findClockTime(entries, ClockType.CLOCK_IN);
-        Instant clockOutTime = findClockTime(entries, ClockType.CLOCK_OUT);
+        // 出勤・退勤時刻を集約から取得する
+        Instant clockInTime = record.getLatestTimeOf(ClockType.CLOCK_IN).value();
+        Instant clockOutTime = record.getLatestTimeOf(ClockType.CLOCK_OUT).value();
 
         // 実勤務時間（分）= 出勤〜退勤の差分
         int actualMinutes = (int) Duration.between(clockInTime, clockOutTime).toMinutes();
 
         // 休憩時間（分）を計算する
-        int breakMinutes = breakTimeCalculator.calculateTotalBreakMinutes(entries);
+        int breakMinutes = breakTimeCalculator.calculateTotalBreakMinutes(record.getClockEntries());
 
         // 実労働時間（分）= 実勤務時間 - 休憩時間
         int netWorkMinutes = actualMinutes - breakMinutes;
@@ -165,17 +161,15 @@ public class WorkDurationCalculator {
      * @return 計算結果
      */
     private CalculationResult calculateInternal(AttendanceRecord record, int scheduledMinutes) {
-        List<ClockEntry> entries = record.getClockEntries();
-
-        // 出勤・退勤時刻を取得する
-        Instant clockInTime = findClockTime(entries, ClockType.CLOCK_IN);
-        Instant clockOutTime = findClockTime(entries, ClockType.CLOCK_OUT);
+        // 出勤・退勤時刻を集約から取得する
+        Instant clockInTime = record.getLatestTimeOf(ClockType.CLOCK_IN).value();
+        Instant clockOutTime = record.getLatestTimeOf(ClockType.CLOCK_OUT).value();
 
         // 実勤務時間（分）= 出勤〜退勤の差分
         int actualMinutes = (int) Duration.between(clockInTime, clockOutTime).toMinutes();
 
         // 休憩時間（分）を計算する
-        int breakMinutes = breakTimeCalculator.calculateTotalBreakMinutes(entries);
+        int breakMinutes = breakTimeCalculator.calculateTotalBreakMinutes(record.getClockEntries());
 
         // 実労働時間（分）= 実勤務時間 - 休憩時間
         int netWorkMinutes = actualMinutes - breakMinutes;
@@ -199,27 +193,6 @@ public class WorkDurationCalculator {
         );
 
         return new CalculationResult(workDuration, overtimeDuration);
-    }
-
-    /**
-     * 打刻エントリから指定種別の最新の打刻時刻を取得する
-     *
-     * <p>打刻修正（CORRECTION）がある場合は、最後のエントリが有効な時刻となる。
-     * 修正エントリはリストの末尾に追加されるため、末尾から検索する。</p>
-     *
-     * @param entries 打刻エントリ一覧
-     * @param type    取得する打刻種別
-     * @return 最新の打刻時刻
-     * @throws IllegalStateException 指定種別の打刻が見つからない場合
-     */
-    private Instant findClockTime(List<ClockEntry> entries, ClockType type) {
-        // 末尾から検索して最新の打刻を取得する（修正エントリ対応）
-        for (int i = entries.size() - 1; i >= 0; i--) {
-            if (entries.get(i).type() == type) {
-                return entries.get(i).time().value();
-            }
-        }
-        throw new IllegalStateException(type + "の打刻が見つかりません");
     }
 
     /**

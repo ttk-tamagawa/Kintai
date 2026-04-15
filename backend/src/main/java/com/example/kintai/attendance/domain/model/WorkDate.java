@@ -1,6 +1,7 @@
 package com.example.kintai.attendance.domain.model;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Objects;
 
 /**
@@ -13,11 +14,28 @@ import java.util.Objects;
  */
 public record WorkDate(LocalDate value) {
 
+    /** タイムゾーン: Asia/Tokyo（打刻時刻から勤務日を算出する際に使用） */
+    private static final ZoneId ZONE_TOKYO = ZoneId.of("Asia/Tokyo");
+
     /**
      * コンパクトコンストラクタ — null値を拒否する
      */
     public WorkDate {
         Objects.requireNonNull(value, "勤務日はnullにできません");
+    }
+
+    /**
+     * 打刻時刻からAsia/Tokyoタイムゾーンで勤務日を算出する
+     *
+     * <p>「打刻時刻がどの勤務日に属するか」はドメインルールであり、
+     * タイムゾーン変換を伴うビジネス判断のため、値オブジェクト自身が持つ。</p>
+     *
+     * @param clockTime 打刻時刻
+     * @return 勤務日（Asia/Tokyo基準）
+     */
+    public static WorkDate from(ClockTime clockTime) {
+        Objects.requireNonNull(clockTime, "打刻時刻はnullにできません");
+        return new WorkDate(clockTime.value().atZone(ZONE_TOKYO).toLocalDate());
     }
 
     /**
