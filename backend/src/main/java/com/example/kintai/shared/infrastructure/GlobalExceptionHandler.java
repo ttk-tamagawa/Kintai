@@ -1,5 +1,8 @@
 package com.example.kintai.shared.infrastructure;
 
+import com.example.kintai.shared.domain.exception.BusinessRuleViolationException;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -27,8 +30,12 @@ import java.util.Map;
  * <ul>
  *   <li>MethodArgumentNotValidException → 400（Bean Validationエラー）</li>
  *   <li>HttpMessageNotReadableException → 400（JSON形式不正・enum値不正）</li>
- *   <li>IllegalArgumentException → 404（リソース未検出）</li>
- *   <li>IllegalStateException → 409（状態遷移違反）</li>
+ *   <li>IllegalArgumentException → 400（引数不正・enum値パース失敗）</li>
+ *   <li>ResourceNotFoundException → 404（リソース未検出）</li>
+ *   <li>BusinessRuleViolationException → 409（ドメインルール違反）</li>
+ *   <li>IllegalStateException → 409（集約の状態遷移違反）</li>
+ *   <li>AccessDeniedException → 403（アクセス拒否）</li>
+ *   <li>AuthenticationException → 401（認証エラー、再スロー）</li>
  *   <li>Exception → 500（予期せぬエラー）</li>
  * </ul>
  * </p>
@@ -91,14 +98,34 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * リソース未検出 → 404 Not Found
+     * 引数不正 → 400 Bad Request
      *
-     * <p>リポジトリの検索で対象が見つからない場合にスローされる
+     * <p>値オブジェクトのバリデーションやenum値のパースに失敗した場合にスローされる
      * IllegalArgumentExceptionをキャッチする。</p>
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ProblemDetail handleNotFoundException(
+    public ProblemDetail handleIllegalArgumentException(
             IllegalArgumentException ex, HttpServletRequest request) {
+        log.warn("引数不正: URI={}, message={}", request.getRequestURI(), ex.getMessage());
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, ex.getMessage());
+        problemDetail.setTitle("Bad Request");
+        problemDetail.setType(URI.create("https://api.example.com/errors/bad-request"));
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
+
+        return problemDetail;
+    }
+
+    /**
+     * リソース未検出 → 404 Not Found
+     *
+     * <p>リポジトリの検索で対象が見つからない場合にスローされる
+     * ResourceNotFoundExceptionをキャッチする。</p>
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ProblemDetail handleNotFoundException(
+            ResourceNotFoundException ex, HttpServletRequest request) {
         log.warn("リソース未検出: URI={}, message={}", request.getRequestURI(), ex.getMessage());
 
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
@@ -111,14 +138,35 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 状態遷移違反 → 409 Conflict
+     * ドメインルール違反 → 409 Conflict
      *
-     * <p>ドメイン集約のガード条件に違反した場合にスローされる
+     * <p>ドメインのビジネスルール（不変条件・事前条件）に違反した場合にスローされる
+     * BusinessRuleViolationExceptionをキャッチする。
+     * 例: 出勤済みの従業員に対する再出勤、無効化パターンの割当、パターン名の重複</p>
+     */
+    @ExceptionHandler(BusinessRuleViolationException.class)
+    public ProblemDetail handleConflictException(
+            BusinessRuleViolationException ex, HttpServletRequest request) {
+        log.warn("ドメインルール違反: URI={}, message={}", request.getRequestURI(), ex.getMessage());
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, ex.getMessage());
+        problemDetail.setTitle("Conflict");
+        problemDetail.setType(URI.create("https://api.example.com/errors/conflict"));
+        problemDetail.setInstance(URI.create(request.getRequestURI()));
+
+        return problemDetail;
+    }
+
+    /**
+     * 集約の状態遷移違反 → 409 Conflict
+     *
+     * <p>ドメイン集約のガード条件（状態遷移チェック）に違反した場合にスローされる
      * IllegalStateExceptionをキャッチする。
      * 例: 出勤済みの従業員に対する再出勤、休憩中でない従業員の休憩終了</p>
      */
     @ExceptionHandler(IllegalStateException.class)
-    public ProblemDetail handleConflictException(
+    public ProblemDetail handleStateException(
             IllegalStateException ex, HttpServletRequest request) {
         log.warn("状態遷移違反: URI={}, message={}", request.getRequestURI(), ex.getMessage());
 

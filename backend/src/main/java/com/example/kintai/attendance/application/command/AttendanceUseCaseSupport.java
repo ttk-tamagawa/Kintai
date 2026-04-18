@@ -3,6 +3,7 @@ package com.example.kintai.attendance.application.command;
 import com.example.kintai.attendance.domain.model.AttendanceRecord;
 import com.example.kintai.attendance.domain.repository.AttendanceEventRepository;
 import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.kernel.contract.DomainEvent;
 import tools.jackson.core.JacksonException;
@@ -55,11 +56,11 @@ public class AttendanceUseCaseSupport {
      *
      * @param id 勤怠記録ID
      * @return 勤怠記録
-     * @throws IllegalArgumentException 勤怠記録が見つからない場合
+     * @throws ResourceNotFoundException 勤怠記録が見つからない場合
      */
     public AttendanceRecord findRecordOrThrow(AttendanceRecordId id) {
         return attendanceRecordRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "勤怠記録が見つかりません: " + id.value()));
     }
 
@@ -102,7 +103,7 @@ public class AttendanceUseCaseSupport {
                     event.getEventId(), attendanceId, event.getEventType(),
                     payloadJson, event.getOccurredAt());
         } catch (JacksonException e) {
-            throw new IllegalStateException(
+            throw new RuntimeException(
                     "イベントのJSON変換に失敗しました: eventType=" + event.getEventType(), e);
         }
     }

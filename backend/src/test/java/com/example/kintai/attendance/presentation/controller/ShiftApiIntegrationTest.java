@@ -397,9 +397,9 @@ class ShiftApiIntegrationTest {
             ResponseEntity<ProblemDetail> response = restTemplate.postForEntity(
                     SCHEDULES_URL, request, ProblemDetail.class);
 
-            // INACTIVEパターンの使用は IllegalArgumentException → 404 Not Found が返却されること
-            // （GlobalExceptionHandler が IllegalArgumentException を 404 にマッピングする）
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            // INACTIVEパターンの使用は BusinessRuleViolationException → 409 Conflict が返却されること
+            // （GlobalExceptionHandler が BusinessRuleViolationException を 409 にマッピングする）
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         }
 
         @Test
@@ -426,7 +426,7 @@ class ShiftApiIntegrationTest {
                     null, ScheduleResponse.class);
             assertThat(firstPublish.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-            // 2回目の公開（既にPUBLISHED → IllegalStateException → 409 Conflict）
+            // 2回目の公開（既にPUBLISHED → 集約の状態遷移違反 → 409 Conflict）
             ResponseEntity<ProblemDetail> secondPublish = restTemplate.postForEntity(
                     SCHEDULES_URL + "/" + scheduleId + "/actions/publish",
                     null, ProblemDetail.class);

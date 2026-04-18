@@ -45,8 +45,6 @@ public class UnpublishScheduleUseCase implements UseCase<UnpublishScheduleComman
      *
      * @param command スケジュール非公開コマンド（スケジュールID）
      * @return 非公開後のスケジュール（Write Model）
-     * @throws IllegalArgumentException スケジュールが見つからない場合
-     * @throws IllegalStateException    PUBLISHEDでない場合
      */
     @Override
     public WeeklySchedule execute(UnpublishScheduleCommand command) {

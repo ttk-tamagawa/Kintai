@@ -6,6 +6,7 @@ import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.service.WorkDurationCalculator;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +97,7 @@ public class CorrectClockUseCase implements UseCase<CorrectClockCommand, Void> {
         if (record.getShiftPatternId() != null) {
             // シフト制: シフトパターンから所定労働時間を取得して計算する
             ShiftPattern pattern = shiftPatternRepository.findById(record.getShiftPatternId())
-                    .orElseThrow(() -> new IllegalStateException(
+                    .orElseThrow(() -> new ResourceNotFoundException(
                             "シフトパターンが見つかりません: " + record.getShiftPatternId().value()));
             int scheduledMinutes = pattern.calculateScheduledMinutes();
             return workDurationCalculator.calculateForShift(record, scheduledMinutes);

@@ -2,6 +2,7 @@ package com.example.kintai.attendance.presentation.controller;
 
 import java.time.Instant;
 
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -317,11 +318,11 @@ public class AttendanceCommandController {
      * @param employeeId 従業員ID
      * @param workDate   勤務日
      * @return 勤怠記録
-     * @throws IllegalArgumentException 勤怠記録が見つからない場合
+     * @throws ResourceNotFoundException 勤怠記録が見つからない場合
      */
     private AttendanceRecord findRecordByEmployeeAndDate(EmployeeId employeeId, WorkDate workDate) {
         return attendanceRecordRepository.findByEmployeeIdAndWorkDate(employeeId, workDate)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "当日の勤怠記録が見つかりません: employeeId=" + employeeId.value()
                                 + ", workDate=" + workDate.value()));
     }
@@ -329,13 +330,16 @@ public class AttendanceCommandController {
     /**
      * 勤怠記録IDでレコードを取得する（見つからない場合はシステムエラー）
      *
+     * <p>保存直後の取得失敗はDB障害またはバグを示すため、
+     * RuntimeExceptionをスローして500 Internal Server Errorを返す。</p>
+     *
      * @param id 勤怠記録ID
      * @return 勤怠記録
-     * @throws IllegalStateException 保存直後のレコードが取得できない場合
+     * @throws RuntimeException 保存直後のレコードが取得できない場合
      */
     private AttendanceRecord findRecordOrThrow(AttendanceRecordId id) {
         return attendanceRecordRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new RuntimeException(
                         "保存直後のレコードが取得できません: attendanceId=" + id.value()));
     }
 

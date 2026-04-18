@@ -4,6 +4,8 @@ import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
+import com.example.kintai.shared.domain.exception.BusinessRuleViolationException;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
@@ -57,7 +59,6 @@ public class ChangeScheduleUseCase implements UseCase<ChangeScheduleCommand, Ass
      *
      * @param command スケジュール変更コマンド（スケジュールID、新しい曜日ごとの割当）
      * @return 変更結果（スケジュールとパターン名を含む）
-     * @throws IllegalArgumentException スケジュールが見つからない場合、パターンがINACTIVEの場合
      */
     @Override
     public AssignScheduleResult execute(ChangeScheduleCommand command) {
@@ -90,7 +91,8 @@ public class ChangeScheduleUseCase implements UseCase<ChangeScheduleCommand, Ass
      *
      * @param assignments 曜日ごとのパターン割当
      * @return パターンID→パターン名のマップ
-     * @throws IllegalArgumentException パターンが見つからない場合、INACTIVEの場合
+     * @throws ResourceNotFoundException パターンが見つからない場合
+     * @throws BusinessRuleViolationException パターンがINACTIVEの場合
      */
     private Map<ShiftPatternId, String> validateAndCollectPatternNames(
             Map<DayOfWeek, ShiftPatternId> assignments) {
@@ -101,14 +103,14 @@ public class ChangeScheduleUseCase implements UseCase<ChangeScheduleCommand, Ass
 
             // パターンをリポジトリから取得する（存在しなければ例外）
             ShiftPattern pattern = shiftPatternRepository.findById(patternId)
-                    .orElseThrow(() -> new IllegalArgumentException(
+                    .orElseThrow(() -> new ResourceNotFoundException(
                             "シフトパターンが見つかりません: " + patternId.value()
                                     + "（" + entry.getKey() + "の割当）"
                     ));
 
             // ACTIVEであることを検証する（INV-SH-002）
             if (!pattern.isActive()) {
-                throw new IllegalArgumentException(
+                throw new BusinessRuleViolationException(
                         "パターン「" + pattern.getName().value() + "」は無効化されているため割当できません"
                                 + "（" + entry.getKey() + "の割当）"
                 );

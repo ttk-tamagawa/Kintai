@@ -2,6 +2,7 @@ package com.example.kintai.attendance.application.query;
 
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +37,7 @@ public class GetScheduleQueryService implements QueryService<GetScheduleQuery, S
      *
      * @param query スケジュール詳細取得クエリ（スケジュールID）
      * @return スケジュール概要
-     * @throws IllegalArgumentException スケジュールが見つからない場合
+     * @throws ResourceNotFoundException スケジュールが見つからない場合
      */
     @Override
     public ScheduleSummary execute(GetScheduleQuery query) {
@@ -44,7 +45,7 @@ public class GetScheduleQueryService implements QueryService<GetScheduleQuery, S
 
         // ShiftQueryRepositoryからIDで検索する（見つからなければ例外）
         ScheduleSummary schedule = shiftQueryRepository.findScheduleById(query.scheduleId())
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "スケジュールが見つかりません: " + query.scheduleId()));
 
         log.debug("スケジュール詳細取得完了: employeeId={}, weekStartDate={}",

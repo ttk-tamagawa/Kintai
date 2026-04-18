@@ -3,6 +3,7 @@ package com.example.kintai.attendance.application.command;
 import com.example.kintai.attendance.domain.model.shift.PatternName;
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
+import com.example.kintai.shared.domain.exception.BusinessRuleViolationException;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import com.example.kintai.shared.kernel.contract.DomainEvent;
 import com.example.kintai.shared.kernel.contract.UseCase;
@@ -53,7 +54,7 @@ public class DefinePatternUseCase implements UseCase<DefinePatternCommand, Shift
      *
      * @param command シフトパターン定義コマンド（パターン名、開始/終了時刻、休憩時間、夜勤フラグ）
      * @return 作成されたシフトパターンID
-     * @throws IllegalArgumentException パターン名が重複している場合
+     * @throws BusinessRuleViolationException パターン名が重複している場合
      */
     @Override
     public ShiftPatternId execute(DefinePatternCommand command) {
@@ -63,7 +64,7 @@ public class DefinePatternUseCase implements UseCase<DefinePatternCommand, Shift
 
         // パターン名の一意性をリポジトリで検証する（INV-SH-001: 名前はシステム全体で一意）
         if (shiftPatternRepository.existsByName(patternName)) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleViolationException(
                     "パターン名「" + patternName.value() + "」は既に使用されています"
             );
         }

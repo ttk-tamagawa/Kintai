@@ -2,6 +2,7 @@ package com.example.kintai.attendance.application.command;
 
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
@@ -38,8 +39,6 @@ public class ReactivatePatternUseCase implements UseCase<ReactivatePatternComman
      *
      * @param command シフトパターン再有効化コマンド（パターンID）
      * @return null（戻り値なし）
-     * @throws IllegalArgumentException パターンが見つからない場合
-     * @throws IllegalStateException    既にACTIVEの場合
      */
     @Override
     public Void execute(ReactivatePatternCommand command) {
@@ -63,7 +62,7 @@ public class ReactivatePatternUseCase implements UseCase<ReactivatePatternComman
      */
     private ShiftPattern findPatternOrThrow(ShiftPatternId patternId) {
         return shiftPatternRepository.findById(patternId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "シフトパターンが見つかりません: " + patternId.value()));
     }
 }

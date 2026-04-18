@@ -45,8 +45,6 @@ public class PublishScheduleUseCase implements UseCase<PublishScheduleCommand, W
      *
      * @param command スケジュール公開コマンド（スケジュールID）
      * @return 公開後のスケジュール（Write Model）
-     * @throws IllegalArgumentException スケジュールが見つからない場合
-     * @throws IllegalStateException    既にPUBLISHEDの場合
      */
     @Override
     public WeeklySchedule execute(PublishScheduleCommand command) {

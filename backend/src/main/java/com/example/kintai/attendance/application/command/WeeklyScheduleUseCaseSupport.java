@@ -3,6 +3,7 @@ package com.example.kintai.attendance.application.command;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleEventRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.domain.model.ScheduleId;
 import com.example.kintai.shared.kernel.contract.DomainEvent;
 import tools.jackson.core.JacksonException;
@@ -55,11 +56,11 @@ public class WeeklyScheduleUseCaseSupport {
      *
      * @param scheduleId スケジュールID
      * @return 週次スケジュール
-     * @throws IllegalArgumentException スケジュールが見つからない場合
+     * @throws ResourceNotFoundException スケジュールが見つからない場合
      */
     public WeeklySchedule findScheduleOrThrow(ScheduleId scheduleId) {
         return weeklyScheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "スケジュールが見つかりません: " + scheduleId.value()));
     }
 
@@ -102,7 +103,7 @@ public class WeeklyScheduleUseCaseSupport {
                     event.getEventId(), scheduleId, event.getEventType(),
                     payloadJson, event.getOccurredAt());
         } catch (JacksonException e) {
-            throw new IllegalStateException(
+            throw new RuntimeException(
                     "イベントのJSON変換に失敗しました: eventType=" + event.getEventType(), e);
         }
     }

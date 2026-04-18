@@ -3,6 +3,8 @@ package com.example.kintai.attendance.application.command;
 import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
+import com.example.kintai.shared.domain.exception.BusinessRuleViolationException;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +48,6 @@ public class DeactivatePatternUseCase implements UseCase<DeactivatePatternComman
      *
      * @param command シフトパターン無効化コマンド（パターンID）
      * @return null（戻り値なし）
-     * @throws IllegalArgumentException パターンが見つからない場合
-     * @throws IllegalStateException    既にINACTIVEの場合、または未来の割当で使用中の場合
      */
     @Override
     public Void execute(DeactivatePatternCommand command) {
@@ -58,7 +58,7 @@ public class DeactivatePatternUseCase implements UseCase<DeactivatePatternComman
 
         // 未来の週次スケジュールで使用されていないことを検証する
         if (weeklyScheduleRepository.existsFutureAssignmentByPatternId(command.patternId())) {
-            throw new IllegalStateException(
+            throw new BusinessRuleViolationException(
                     "パターン「" + pattern.getName().value() + "」は未来の週次スケジュールで使用されているため無効化できません"
             );
         }
@@ -78,7 +78,7 @@ public class DeactivatePatternUseCase implements UseCase<DeactivatePatternComman
      */
     private ShiftPattern findPatternOrThrow(com.example.kintai.shared.domain.model.ShiftPatternId patternId) {
         return shiftPatternRepository.findById(patternId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "シフトパターンが見つかりません: " + patternId.value()));
     }
 }

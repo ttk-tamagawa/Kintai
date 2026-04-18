@@ -4,6 +4,8 @@ import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
+import com.example.kintai.shared.domain.exception.BusinessRuleViolationException;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
@@ -58,8 +60,7 @@ public class AssignScheduleUseCase implements UseCase<AssignScheduleCommand, Ass
      *
      * @param command スケジュール割当コマンド（従業員ID、週開始日、曜日ごとの割当）
      * @return 割当結果（スケジュールとパターン名を含む）
-     * @throws IllegalStateException    同一従業員・同一週にスケジュールが既に存在する場合
-     * @throws IllegalArgumentException 割当パターンがINACTIVEの場合
+     * @throws BusinessRuleViolationException 同一従業員・同一週にスケジュールが既に存在する場合
      */
     @Override
     public AssignScheduleResult execute(AssignScheduleCommand command) {
@@ -69,7 +70,7 @@ public class AssignScheduleUseCase implements UseCase<AssignScheduleCommand, Ass
         // 従業員ID+週開始日の重複をチェックする（1従業員1週1スケジュール）
         if (weeklyScheduleRepository.existsByEmployeeIdAndWeekStartDate(
                 command.employeeId(), command.weekStartDate())) {
-            throw new IllegalStateException(
+            throw new BusinessRuleViolationException(
                     "この従業員の" + command.weekStartDate() + "週のスケジュールは既に登録されています"
             );
         }
@@ -99,7 +100,8 @@ public class AssignScheduleUseCase implements UseCase<AssignScheduleCommand, Ass
      *
      * @param assignments 曜日ごとのパターン割当
      * @return パターンID→パターン名のマップ
-     * @throws IllegalArgumentException パターンが見つからない場合、INACTIVEの場合
+     * @throws ResourceNotFoundException パターンが見つからない場合
+     * @throws BusinessRuleViolationException パターンがINACTIVEの場合
      */
     private Map<ShiftPatternId, String> validateAndCollectPatternNames(
             Map<DayOfWeek, ShiftPatternId> assignments) {
@@ -110,14 +112,14 @@ public class AssignScheduleUseCase implements UseCase<AssignScheduleCommand, Ass
 
             // パターンをリポジトリから取得する（存在しなければ例外）
             ShiftPattern pattern = shiftPatternRepository.findById(patternId)
-                    .orElseThrow(() -> new IllegalArgumentException(
+                    .orElseThrow(() -> new ResourceNotFoundException(
                             "シフトパターンが見つかりません: " + patternId.value()
                                     + "（" + entry.getKey() + "の割当）"
                     ));
 
             // ACTIVEであることを検証する（INV-SH-002）
             if (!pattern.isActive()) {
-                throw new IllegalArgumentException(
+                throw new BusinessRuleViolationException(
                         "パターン「" + pattern.getName().value() + "」は無効化されているため割当できません"
                                 + "（" + entry.getKey() + "の割当）"
                 );

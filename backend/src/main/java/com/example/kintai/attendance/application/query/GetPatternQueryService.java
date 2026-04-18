@@ -2,6 +2,7 @@ package com.example.kintai.attendance.application.query;
 
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
 import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.PatternSummary;
+import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +37,7 @@ public class GetPatternQueryService implements QueryService<GetPatternQuery, Pat
      *
      * @param query パターン詳細取得クエリ（パターンID）
      * @return パターン概要
-     * @throws IllegalArgumentException パターンが見つからない場合
+     * @throws ResourceNotFoundException パターンが見つからない場合
      */
     @Override
     public PatternSummary execute(GetPatternQuery query) {
@@ -44,7 +45,7 @@ public class GetPatternQueryService implements QueryService<GetPatternQuery, Pat
 
         // ShiftQueryRepositoryからIDで検索する（見つからなければ例外）
         PatternSummary pattern = shiftQueryRepository.findPatternById(query.patternId())
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "シフトパターンが見つかりません: " + query.patternId()));
 
         log.debug("シフトパターン詳細取得完了: name={}", pattern.name());

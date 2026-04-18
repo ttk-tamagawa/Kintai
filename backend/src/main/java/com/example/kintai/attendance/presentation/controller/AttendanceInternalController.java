@@ -293,13 +293,16 @@ public class AttendanceInternalController {
     /**
      * 勤怠記録IDでレコードを取得する（見つからない場合はシステムエラー）
      *
+     * <p>保存直後の取得失敗はDB障害またはバグを示すため、
+     * RuntimeExceptionをスローして500 Internal Server Errorを返す。</p>
+     *
      * @param id 勤怠記録ID
      * @return 勤怠記録
-     * @throws IllegalStateException 保存直後のレコードが取得できない場合
+     * @throws RuntimeException 保存直後のレコードが取得できない場合
      */
     private AttendanceRecord findRecordOrThrow(AttendanceRecordId id) {
         return attendanceRecordRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new RuntimeException(
                         "保存直後のレコードが取得できません: attendanceId=" + id.value()));
     }
 }
