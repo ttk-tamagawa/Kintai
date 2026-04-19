@@ -11,8 +11,11 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * シフトパターンリポジトリ実装 — JPA を使用した DB 永続化
@@ -41,6 +44,30 @@ public class ShiftPatternRepositoryImpl implements ShiftPatternRepository {
         // shift_patternsテーブルからIDで検索し、ドメインモデルに変換
         return jpaShiftPatternRepo.findById(id.value())
                 .map(this::toDomainModel);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ShiftPattern> findAllById(Collection<ShiftPatternId> ids) {
+        // 空集合の場合はDBアクセスせず空リストを返す
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+
+        // ShiftPatternId → UUID に変換してJPAに渡す（IN句による1クエリ取得）
+        List<UUID> uuidIds = ids.stream()
+                .map(ShiftPatternId::value)
+                .collect(Collectors.toList());
+
+        // JpaRepositoryのfindAllByIdでまとめて取得（SELECT ... WHERE id IN (...) 1本）
+        List<ShiftPatternJpaEntity> entities = jpaShiftPatternRepo.findAllById(uuidIds);
+
+        // JPAエンティティ → ドメインモデルに変換
+        List<ShiftPattern> result = new ArrayList<>(entities.size());
+        for (ShiftPatternJpaEntity entity : entities) {
+            result.add(toDomainModel(entity));
+        }
+        return result;
     }
 
     @Override

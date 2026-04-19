@@ -1,11 +1,7 @@
 package com.example.kintai.attendance.application.command;
 
-import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
-import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
-import com.example.kintai.shared.domain.exception.BusinessRuleViolationException;
-import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
@@ -13,8 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -38,19 +32,14 @@ public class ChangeScheduleUseCase implements UseCase<ChangeScheduleCommand, Ass
     /** 週次スケジュールリポジトリ — スケジュールの保存用 */
     private final WeeklyScheduleRepository weeklyScheduleRepository;
 
-    /** シフトパターンリポジトリ — パターンのACTIVE検証用 */
-    private final ShiftPatternRepository shiftPatternRepository;
-
-    /** 共通サポート — スケジュール取得・イベント永続化用 */
+    /** 共通サポート — スケジュール取得・パターン検証・イベント永続化用 */
     private final WeeklyScheduleUseCaseSupport support;
 
     public ChangeScheduleUseCase(
             WeeklyScheduleRepository weeklyScheduleRepository,
-            ShiftPatternRepository shiftPatternRepository,
             WeeklyScheduleUseCaseSupport support
     ) {
         this.weeklyScheduleRepository = weeklyScheduleRepository;
-        this.shiftPatternRepository = shiftPatternRepository;
         this.support = support;
     }
 
@@ -68,7 +57,8 @@ public class ChangeScheduleUseCase implements UseCase<ChangeScheduleCommand, Ass
         WeeklySchedule schedule = support.findScheduleOrThrow(command.scheduleId());
 
         // 新しい割当パターンが全てACTIVEであることを検証し、パターン名を取得する（INV-SH-002）
-        Map<ShiftPatternId, String> patternNames = validateAndCollectPatternNames(command.newAssignments());
+        // 内部でfindAllByIdによる一括取得を行うためN+1が発生しない
+        Map<ShiftPatternId, String> patternNames = support.validateAndCollectPatternNames(command.newAssignments());
 
         // 集約のchangeAssignments()を呼び出す（PUBLISHEDならDRAFTに戻る、変更前ステータスは集約内で退避）
         schedule.changeAssignments(command.newAssignments());
@@ -82,44 +72,5 @@ public class ChangeScheduleUseCase implements UseCase<ChangeScheduleCommand, Ass
         log.debug("スケジュール変更完了: scheduleId={}, newStatus={}",
                 command.scheduleId().value(), schedule.getStatus());
         return new AssignScheduleResult(schedule, patternNames);
-    }
-
-    /**
-     * 割当パターンが全てACTIVEであることを検証し、パターン名を収集する
-     *
-     * <p>INV-SH-002: 非アクティブなパターンは新規割当に使用不可。</p>
-     *
-     * @param assignments 曜日ごとのパターン割当
-     * @return パターンID→パターン名のマップ
-     * @throws ResourceNotFoundException パターンが見つからない場合
-     * @throws BusinessRuleViolationException パターンがINACTIVEの場合
-     */
-    private Map<ShiftPatternId, String> validateAndCollectPatternNames(
-            Map<DayOfWeek, ShiftPatternId> assignments) {
-        Map<ShiftPatternId, String> patternNames = new HashMap<>();
-
-        for (Map.Entry<DayOfWeek, ShiftPatternId> entry : assignments.entrySet()) {
-            ShiftPatternId patternId = entry.getValue();
-
-            // パターンをリポジトリから取得する（存在しなければ例外）
-            ShiftPattern pattern = shiftPatternRepository.findById(patternId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "シフトパターンが見つかりません: " + patternId.value()
-                                    + "（" + entry.getKey() + "の割当）"
-                    ));
-
-            // ACTIVEであることを検証する（INV-SH-002）
-            if (!pattern.isActive()) {
-                throw new BusinessRuleViolationException(
-                        "パターン「" + pattern.getName().value() + "」は無効化されているため割当できません"
-                                + "（" + entry.getKey() + "の割当）"
-                );
-            }
-
-            // パターン名を収集する（レスポンス構築用）
-            patternNames.put(patternId, pattern.getName().value());
-        }
-
-        return patternNames;
     }
 }
