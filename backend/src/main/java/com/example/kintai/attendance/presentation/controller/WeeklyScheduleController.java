@@ -14,7 +14,7 @@ import com.example.kintai.attendance.application.query.GetScheduleQueryService;
 import com.example.kintai.attendance.application.query.GetSchedulesQuery;
 import com.example.kintai.attendance.application.query.GetSchedulesQueryService;
 import com.example.kintai.attendance.domain.model.shift.WeeklySchedule;
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
+import com.example.kintai.attendance.application.query.ShiftFinder.ScheduleSummary;
 import com.example.kintai.attendance.presentation.dto.AssignScheduleRequest;
 import com.example.kintai.attendance.presentation.dto.ChangeScheduleRequest;
 import com.example.kintai.attendance.presentation.dto.ScheduleResponse;

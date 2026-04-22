@@ -1,8 +1,7 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DailySummary;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.PageResult;
+import com.example.kintai.attendance.application.query.AttendanceFinder.DailySummary;
+import com.example.kintai.attendance.application.query.AttendanceFinder.PageResult;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,11 +27,11 @@ public class GetDailyAttendancesQueryService implements QueryService<GetDailyAtt
 
     private static final Logger log = LoggerFactory.getLogger(GetDailyAttendancesQueryService.class);
 
-    /** Read Modelクエリリポジトリ */
-    private final AttendanceSummaryQueryRepository queryRepository;
+    /** Read Model ファインダー */
+    private final AttendanceFinder finder;
 
-    public GetDailyAttendancesQueryService(AttendanceSummaryQueryRepository queryRepository) {
-        this.queryRepository = queryRepository;
+    public GetDailyAttendancesQueryService(AttendanceFinder finder) {
+        this.finder = finder;
     }
 
     /**
@@ -54,7 +53,7 @@ public class GetDailyAttendancesQueryService implements QueryService<GetDailyAtt
                 query.employeeId().value(), from, to, query.status(), query.page(), query.size());
 
         // ページネーション付きで日次サマリーを取得する
-        return queryRepository.findDailySummariesPaged(
+        return finder.findDailySummariesPaged(
                 query.employeeId(), from, to, query.status(), query.page(), query.size(), sort, dir);
     }
 }

@@ -98,7 +98,7 @@ public class ShiftPatternRepositoryImpl implements ShiftPatternRepository {
         ShiftPatternJpaEntity saved = jpaShiftPatternRepo.saveAndFlush(entity);
 
         // 保存後のバージョンを反映したドメインオブジェクトを返す
-        return ShiftPattern.reconstruct(
+        ShiftPattern reconstructed = ShiftPattern.reconstruct(
                 ShiftPatternId.of(saved.getId()),
                 new PatternName(saved.getName()),
                 saved.getStartTime(),
@@ -110,6 +110,9 @@ public class ShiftPatternRepositoryImpl implements ShiftPatternRepository {
                 saved.getCreatedAt(),
                 saved.getUpdatedAt()
         );
+        // 元の集約に登録されたドメインイベントを引き継ぐ（reconstruct で失われないようにする）
+        reconstructed.inheritEventsFrom(pattern);
+        return reconstructed;
     }
 
     @Override

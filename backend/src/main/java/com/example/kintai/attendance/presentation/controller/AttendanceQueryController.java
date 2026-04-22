@@ -34,8 +34,8 @@ import com.example.kintai.attendance.application.query.GetMonthlySummaryQuerySer
 import com.example.kintai.attendance.application.query.GetTodayAttendanceQuery;
 import com.example.kintai.attendance.application.query.GetTodayAttendanceQueryService;
 import com.example.kintai.attendance.application.query.TodayAttendanceResult;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DailySummary;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.PageResult;
+import com.example.kintai.attendance.application.query.AttendanceFinder.DailySummary;
+import com.example.kintai.attendance.application.query.AttendanceFinder.PageResult;
 import com.example.kintai.attendance.presentation.dto.DailyAttendancePageResponse;
 import com.example.kintai.attendance.presentation.dto.DailyAttendancePageResponse.DailyAttendanceRow;
 import com.example.kintai.attendance.presentation.dto.DepartmentDashboardResponse;

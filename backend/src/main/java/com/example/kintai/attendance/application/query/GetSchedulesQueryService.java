@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
+import com.example.kintai.attendance.application.query.ShiftFinder.ScheduleSummary;
 import com.example.kintai.shared.domain.model.EmployeeId;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
@@ -21,7 +20,7 @@ import java.util.List;
  * <ol>
  *   <li>from/toが省略された場合はデフォルト値を設定する（今週の月曜〜4週先の日曜）</li>
  *   <li>employeeIdが省略された場合は全従業員のスケジュールを返す（カレンダー表示用）</li>
- *   <li>ShiftQueryRepositoryからRead Modelを参照してスケジュール一覧を取得する</li>
+ *   <li>ShiftFinderからRead Modelを参照してスケジュール一覧を取得する</li>
  * </ol>
  * </p>
  */
@@ -34,11 +33,11 @@ public class GetSchedulesQueryService implements QueryService<GetSchedulesQuery,
     /** デフォルトの表示週数 — 今週を含む4週先まで */
     private static final int DEFAULT_WEEKS_AHEAD = 4;
 
-    /** シフトクエリリポジトリ — Read Model参照用 */
-    private final ShiftQueryRepository shiftQueryRepository;
+    /** シフトファインダー — Read Model参照用 */
+    private final ShiftFinder shiftFinder;
 
-    public GetSchedulesQueryService(ShiftQueryRepository shiftQueryRepository) {
-        this.shiftQueryRepository = shiftQueryRepository;
+    public GetSchedulesQueryService(ShiftFinder shiftFinder) {
+        this.shiftFinder = shiftFinder;
     }
 
     /**
@@ -60,11 +59,11 @@ public class GetSchedulesQueryService implements QueryService<GetSchedulesQuery,
         // employeeIdが省略された場合は全従業員のスケジュールを返す
         List<ScheduleSummary> schedules;
         if (query.employeeId() != null) {
-            schedules = shiftQueryRepository.findSchedules(
+            schedules = shiftFinder.findSchedules(
                     EmployeeId.of(query.employeeId()), effectiveFrom, effectiveTo
             );
         } else {
-            schedules = shiftQueryRepository.findAllSchedules(effectiveFrom, effectiveTo);
+            schedules = shiftFinder.findAllSchedules(effectiveFrom, effectiveTo);
         }
 
         log.debug("スケジュール一覧取得完了: {}件", schedules.size());

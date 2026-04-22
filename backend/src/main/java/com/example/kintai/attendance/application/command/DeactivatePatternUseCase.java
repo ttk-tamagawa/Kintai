@@ -5,9 +5,11 @@ import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.attendance.domain.repository.WeeklyScheduleRepository;
 import com.example.kintai.shared.domain.exception.BusinessRuleViolationException;
 import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,12 +37,17 @@ public class DeactivatePatternUseCase implements UseCase<DeactivatePatternComman
     /** 週次スケジュールリポジトリ — 未来割当チェック用 */
     private final WeeklyScheduleRepository weeklyScheduleRepository;
 
+    /** Springイベント発行 — プロジェクターがRead Modelを更新するトリガー */
+    private final ApplicationEventPublisher eventPublisher;
+
     public DeactivatePatternUseCase(
             ShiftPatternRepository shiftPatternRepository,
-            WeeklyScheduleRepository weeklyScheduleRepository
+            WeeklyScheduleRepository weeklyScheduleRepository,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.shiftPatternRepository = shiftPatternRepository;
         this.weeklyScheduleRepository = weeklyScheduleRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -63,11 +70,17 @@ public class DeactivatePatternUseCase implements UseCase<DeactivatePatternComman
             );
         }
 
-        // 集約のdeactivate()を呼び出す（ガード: ACTIVEであること）
+        // 集約のdeactivate()を呼び出す（ガード: ACTIVEであること、ドメインイベントを登録）
         pattern.deactivate();
 
         // リポジトリに保存する（楽観的ロックでバージョン管理）
-        shiftPatternRepository.save(pattern);
+        ShiftPattern saved = shiftPatternRepository.save(pattern);
+
+        // 集約に蓄積されたドメインイベントを一括で発行する（Projector が Read Model を更新する）
+        for (DomainEvent event : saved.getDomainEvents()) {
+            eventPublisher.publishEvent(event);
+        }
+        saved.clearDomainEvents();
 
         log.debug("シフトパターン無効化完了: patternId={}", command.patternId().value());
         return null;

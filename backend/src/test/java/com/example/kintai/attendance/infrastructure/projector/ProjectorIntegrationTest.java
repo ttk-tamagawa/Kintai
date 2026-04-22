@@ -6,10 +6,18 @@ import com.example.kintai.attendance.application.command.ClockInCommand;
 import com.example.kintai.attendance.application.command.ClockInUseCase;
 import com.example.kintai.attendance.application.command.ClockOutCommand;
 import com.example.kintai.attendance.application.command.ClockOutUseCase;
+import com.example.kintai.attendance.application.command.DeactivatePatternCommand;
+import com.example.kintai.attendance.application.command.DeactivatePatternUseCase;
 import com.example.kintai.attendance.application.command.DefinePatternCommand;
 import com.example.kintai.attendance.application.command.DefinePatternUseCase;
+import com.example.kintai.attendance.application.command.EndBreakCommand;
+import com.example.kintai.attendance.application.command.EndBreakUseCase;
 import com.example.kintai.attendance.application.command.PublishScheduleCommand;
 import com.example.kintai.attendance.application.command.PublishScheduleUseCase;
+import com.example.kintai.attendance.application.command.ReactivatePatternCommand;
+import com.example.kintai.attendance.application.command.ReactivatePatternUseCase;
+import com.example.kintai.attendance.application.command.StartBreakCommand;
+import com.example.kintai.attendance.application.command.StartBreakUseCase;
 import com.example.kintai.attendance.domain.model.ClockSource;
 import com.example.kintai.attendance.domain.model.ClockTime;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
@@ -48,6 +56,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <ul>
  *   <li>{@link AttendanceSummaryProjector} — 出勤打刻→attendance_summaries更新</li>
  *   <li>{@link WeeklyScheduleSummaryProjector} — シフト割当/公開→weekly_schedule_summaries更新</li>
+ *   <li>{@link ShiftPatternSummaryProjector} — パターン定義/無効化/再有効化→shift_pattern_summaries更新</li>
  * </ul>
  * </p>
  *
@@ -68,7 +77,19 @@ class ProjectorIntegrationTest {
     private ClockOutUseCase clockOutUseCase;
 
     @Autowired
+    private StartBreakUseCase startBreakUseCase;
+
+    @Autowired
+    private EndBreakUseCase endBreakUseCase;
+
+    @Autowired
     private DefinePatternUseCase definePatternUseCase;
+
+    @Autowired
+    private DeactivatePatternUseCase deactivatePatternUseCase;
+
+    @Autowired
+    private ReactivatePatternUseCase reactivatePatternUseCase;
 
     @Autowired
     private AssignScheduleUseCase assignScheduleUseCase;
@@ -144,6 +165,10 @@ class ProjectorIntegrationTest {
             // 勤務時間は0のままであることを検証する（退勤前）
             assertEquals(0, summary.get("net_work_minutes"),
                     "退勤前の正味労働時間は0であるべき");
+
+            // 休憩中フラグは false であることを検証する（出勤しただけで休憩開始していないため）
+            assertEquals(Boolean.FALSE, summary.get("is_on_break"),
+                    "出勤直後の is_on_break は false であるべき");
         }
 
         /**
@@ -195,6 +220,69 @@ class ProjectorIntegrationTest {
             int netWorkMinutes = (int) summary.get("net_work_minutes");
             assertTrue(netWorkMinutes > 0,
                     "退勤後の正味労働時間は0より大きいべき（実際: " + netWorkMinutes + "分）");
+
+            // 退勤後は休憩中フラグがリセットされていることを検証する（防御的ロジック）
+            assertEquals(Boolean.FALSE, summary.get("is_on_break"),
+                    "退勤後の is_on_break は false であるべき");
+        }
+
+        /**
+         * 休憩開始→休憩終了フローでの is_on_break フラグ遷移テスト
+         *
+         * <p>review-009 指摘 #3 対応の検証。Query 側が Write Model を触らずに
+         * 「現在休憩中か」を判定できるよう、Read Model のフラグが正しく更新されることを確認する。</p>
+         */
+        @Test
+        @DisplayName("出勤→休憩開始 → is_on_break=true、休憩終了 → is_on_break=false")
+        void breakStartAndEnd_togglesIsOnBreakFlag() {
+            // テスト用のユニークな従業員IDを生成する
+            EmployeeId employeeId = EmployeeId.of(UUID.randomUUID());
+
+            // 本日9:00（JST）に出勤する
+            Instant clockInInstant = ZonedDateTime.now(ZONE_TOKYO)
+                    .withHour(9).withMinute(0).withSecond(0).withNano(0)
+                    .toInstant();
+            AttendanceRecordId attendanceId = clockInUseCase.execute(
+                    new ClockInCommand(employeeId, new ClockTime(clockInInstant), ClockSource.WEB, null)
+            );
+
+            // 12:00 に休憩開始する
+            Instant breakStartInstant = ZonedDateTime.now(ZONE_TOKYO)
+                    .withHour(12).withMinute(0).withSecond(0).withNano(0)
+                    .toInstant();
+            startBreakUseCase.execute(
+                    new StartBreakCommand(attendanceId, new ClockTime(breakStartInstant), ClockSource.WEB)
+            );
+
+            // 休憩開始後の状態を検証する
+            Map<String, Object> afterStart = jdbcTemplate.queryForMap(
+                    "SELECT is_on_break, event_count FROM attendance_summaries WHERE attendance_id = ?",
+                    attendanceId.value()
+            );
+            assertEquals(Boolean.TRUE, afterStart.get("is_on_break"),
+                    "休憩開始後の is_on_break は true であるべき");
+            assertEquals(2, afterStart.get("event_count"),
+                    "ClockedIn + BreakStarted の 2 イベントが処理されているべき");
+
+            // 13:00 に休憩終了する（60分休憩）
+            Instant breakEndInstant = ZonedDateTime.now(ZONE_TOKYO)
+                    .withHour(13).withMinute(0).withSecond(0).withNano(0)
+                    .toInstant();
+            endBreakUseCase.execute(
+                    new EndBreakCommand(attendanceId, new ClockTime(breakEndInstant), ClockSource.WEB)
+            );
+
+            // 休憩終了後の状態を検証する
+            Map<String, Object> afterEnd = jdbcTemplate.queryForMap(
+                    "SELECT is_on_break, break_minutes, event_count FROM attendance_summaries WHERE attendance_id = ?",
+                    attendanceId.value()
+            );
+            assertEquals(Boolean.FALSE, afterEnd.get("is_on_break"),
+                    "休憩終了後の is_on_break は false であるべき");
+            assertEquals(60, afterEnd.get("break_minutes"),
+                    "休憩時間が 60 分として累積されているべき");
+            assertEquals(3, afterEnd.get("event_count"),
+                    "ClockedIn + BreakStarted + BreakEnded の 3 イベントが処理されているべき");
         }
     }
 
@@ -210,9 +298,11 @@ class ProjectorIntegrationTest {
         void setUp() {
             // Read Model・イベントストア・スケジュール・パターンをクリーンアップする
             // FK制約の順序に従い、子テーブルから先に削除する
+            // shift_pattern_summaries も shift_patterns を参照するため、先に削除する
             jdbcTemplate.execute("DELETE FROM weekly_schedule_summaries");
             jdbcTemplate.execute("DELETE FROM weekly_schedule_events");
             jdbcTemplate.execute("DELETE FROM weekly_schedules");
+            jdbcTemplate.execute("DELETE FROM shift_pattern_summaries");
             jdbcTemplate.execute("DELETE FROM shift_patterns");
         }
 
@@ -384,6 +474,127 @@ class ProjectorIntegrationTest {
             // パターン名が保持されていることを検証する
             assertNotNull(publishedSummary.get("monday_pattern_name"),
                     "公開後もパターン名が保持されているべき");
+        }
+    }
+
+    // ========================================
+    // シフトパターンプロジェクターのテスト
+    // ========================================
+
+    @Nested
+    @DisplayName("ShiftPatternSummaryProjector — シフトパターンサマリー更新")
+    class ShiftPatternSummaryProjectorTest {
+
+        @BeforeEach
+        void setUp() {
+            // Read Model・スケジュール・パターンをクリーンアップする
+            // FK制約の順序に従い、子テーブルから先に削除する
+            jdbcTemplate.execute("DELETE FROM weekly_schedule_summaries");
+            jdbcTemplate.execute("DELETE FROM weekly_schedule_events");
+            jdbcTemplate.execute("DELETE FROM weekly_schedules");
+            jdbcTemplate.execute("DELETE FROM shift_pattern_summaries");
+            jdbcTemplate.execute("DELETE FROM shift_patterns");
+        }
+
+        @Test
+        @DisplayName("パターン定義 → shift_pattern_summariesに新規行が作成され、is_active=trueとなる")
+        void definePattern_createsShiftPatternSummary() {
+            // ユニークな名前でパターンを定義する
+            String patternName = "早番_" + UUID.randomUUID().toString().substring(0, 4);
+            ShiftPatternId patternId = definePatternUseCase.execute(new DefinePatternCommand(
+                    patternName,
+                    LocalTime.of(8, 0),
+                    LocalTime.of(17, 0),
+                    60,
+                    false
+            ));
+
+            // shift_pattern_summariesから該当行を取得して検証する
+            Map<String, Object> summary = jdbcTemplate.queryForMap(
+                    "SELECT * FROM shift_pattern_summaries WHERE shift_pattern_id = ?",
+                    patternId.value()
+            );
+
+            // 基本フィールドが正しく設定されていることを検証する
+            assertEquals(patternName, summary.get("name"),
+                    "パターン名が一致するべき");
+            assertEquals(Boolean.TRUE, summary.get("is_active"),
+                    "定義直後は is_active=true であるべき");
+            assertEquals(Boolean.FALSE, summary.get("is_overnight"),
+                    "夜勤フラグは false であるべき");
+
+            // 休憩時間がイベントから伝搬していることを検証する（SMALLINT→intで比較）
+            assertEquals(60, ((Number) summary.get("break_minutes")).intValue(),
+                    "休憩時間が 60 分であるべき");
+
+            // イベント追跡情報を検証する
+            assertEquals(1, summary.get("event_count"),
+                    "定義直後のイベント数は 1 であるべき");
+            assertNotNull(summary.get("last_event_at"),
+                    "最終イベント日時が設定されているべき");
+        }
+
+        @Test
+        @DisplayName("パターン無効化 → shift_pattern_summariesのis_activeがfalseに更新される")
+        void deactivatePattern_updatesIsActiveToFalse() {
+            // まずパターンを定義する
+            ShiftPatternId patternId = definePatternUseCase.execute(new DefinePatternCommand(
+                    "遅番_" + UUID.randomUUID().toString().substring(0, 4),
+                    LocalTime.of(13, 0),
+                    LocalTime.of(22, 0),
+                    60,
+                    false
+            ));
+
+            // パターンを無効化する
+            deactivatePatternUseCase.execute(new DeactivatePatternCommand(patternId));
+
+            // shift_pattern_summariesから該当行を取得して検証する
+            Map<String, Object> summary = jdbcTemplate.queryForMap(
+                    "SELECT * FROM shift_pattern_summaries WHERE shift_pattern_id = ?",
+                    patternId.value()
+            );
+
+            // is_active が false に更新されていることを検証する
+            assertEquals(Boolean.FALSE, summary.get("is_active"),
+                    "無効化後は is_active=false であるべき");
+
+            // イベント数が 2（Defined + Deactivated）であることを検証する
+            assertEquals(2, summary.get("event_count"),
+                    "定義＋無効化後のイベント数は 2 であるべき");
+        }
+
+        @Test
+        @DisplayName("パターン再有効化 → shift_pattern_summariesのis_activeがtrueに更新される")
+        void reactivatePattern_updatesIsActiveToTrue() {
+            // パターンを定義→無効化→再有効化のサイクルを実行する
+            ShiftPatternId patternId = definePatternUseCase.execute(new DefinePatternCommand(
+                    "夜勤_" + UUID.randomUUID().toString().substring(0, 4),
+                    LocalTime.of(22, 0),
+                    LocalTime.of(7, 0),
+                    60,
+                    true
+            ));
+            deactivatePatternUseCase.execute(new DeactivatePatternCommand(patternId));
+            reactivatePatternUseCase.execute(new ReactivatePatternCommand(patternId));
+
+            // shift_pattern_summariesから該当行を取得して検証する
+            Map<String, Object> summary = jdbcTemplate.queryForMap(
+                    "SELECT * FROM shift_pattern_summaries WHERE shift_pattern_id = ?",
+                    patternId.value()
+            );
+
+            // is_active が true に戻っていることを検証する
+            assertEquals(Boolean.TRUE, summary.get("is_active"),
+                    "再有効化後は is_active=true であるべき");
+
+            // イベント数が 3（Defined + Deactivated + Reactivated）であることを検証する
+            assertEquals(3, summary.get("event_count"),
+                    "定義＋無効化＋再有効化後のイベント数は 3 であるべき");
+
+            // 夜勤フラグが保持されていることを検証する（再有効化で変わってはならない）
+            assertEquals(Boolean.TRUE, summary.get("is_overnight"),
+                    "夜勤フラグは再有効化後も保持されるべき");
         }
     }
 }

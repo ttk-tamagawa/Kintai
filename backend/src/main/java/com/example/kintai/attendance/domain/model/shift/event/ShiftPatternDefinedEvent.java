@@ -28,6 +28,8 @@ public class ShiftPatternDefinedEvent extends DomainEvent {
     private final LocalTime startTime;
     /** 勤務終了時刻 */
     private final LocalTime endTime;
+    /** 休憩時間（分） */
+    private final int breakMinutes;
     /** 夜勤フラグ（trueなら日跨ぎパターン） */
     private final boolean isOvernight;
 
@@ -39,6 +41,7 @@ public class ShiftPatternDefinedEvent extends DomainEvent {
             PatternName name,
             LocalTime startTime,
             LocalTime endTime,
+            int breakMinutes,
             boolean isOvernight
     ) {
         super();
@@ -46,6 +49,7 @@ public class ShiftPatternDefinedEvent extends DomainEvent {
         this.name = Objects.requireNonNull(name, "パターン名はnullにできません");
         this.startTime = Objects.requireNonNull(startTime, "勤務開始時刻はnullにできません");
         this.endTime = Objects.requireNonNull(endTime, "勤務終了時刻はnullにできません");
+        this.breakMinutes = breakMinutes;
         this.isOvernight = isOvernight;
     }
 
@@ -58,6 +62,7 @@ public class ShiftPatternDefinedEvent extends DomainEvent {
     public PatternName name() { return name; }
     public LocalTime startTime() { return startTime; }
     public LocalTime endTime() { return endTime; }
+    public int breakMinutes() { return breakMinutes; }
     public boolean isOvernight() { return isOvernight; }
     public Instant occurredAt() { return getOccurredAt(); }
 
@@ -72,8 +77,9 @@ public class ShiftPatternDefinedEvent extends DomainEvent {
             PatternName name,
             LocalTime startTime,
             LocalTime endTime,
+            int breakMinutes,
             boolean isOvernight
     ) {
-        return new ShiftPatternDefinedEvent(patternId, name, startTime, endTime, isOvernight);
+        return new ShiftPatternDefinedEvent(patternId, name, startTime, endTime, breakMinutes, isOvernight);
     }
 }

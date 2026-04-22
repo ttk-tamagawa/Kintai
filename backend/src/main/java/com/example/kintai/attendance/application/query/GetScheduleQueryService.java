@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.ScheduleSummary;
+import com.example.kintai.attendance.application.query.ShiftFinder.ScheduleSummary;
 import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
@@ -14,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>処理フロー:
  * <ol>
- *   <li>スケジュールIDでShiftQueryRepositoryから検索する</li>
+ *   <li>スケジュールIDでShiftFinderから検索する</li>
  *   <li>見つからない場合は例外をスローする</li>
  * </ol>
  * </p>
@@ -25,11 +24,11 @@ public class GetScheduleQueryService implements QueryService<GetScheduleQuery, S
 
     private static final Logger log = LoggerFactory.getLogger(GetScheduleQueryService.class);
 
-    /** シフトクエリリポジトリ — Read Model参照用 */
-    private final ShiftQueryRepository shiftQueryRepository;
+    /** シフトファインダー — Read Model参照用 */
+    private final ShiftFinder shiftFinder;
 
-    public GetScheduleQueryService(ShiftQueryRepository shiftQueryRepository) {
-        this.shiftQueryRepository = shiftQueryRepository;
+    public GetScheduleQueryService(ShiftFinder shiftFinder) {
+        this.shiftFinder = shiftFinder;
     }
 
     /**
@@ -43,8 +42,8 @@ public class GetScheduleQueryService implements QueryService<GetScheduleQuery, S
     public ScheduleSummary execute(GetScheduleQuery query) {
         log.debug("スケジュール詳細取得: scheduleId={}", query.scheduleId());
 
-        // ShiftQueryRepositoryからIDで検索する（見つからなければ例外）
-        ScheduleSummary schedule = shiftQueryRepository.findScheduleById(query.scheduleId())
+        // ShiftFinderからIDで検索する（見つからなければ例外）
+        ScheduleSummary schedule = shiftFinder.findScheduleById(query.scheduleId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "スケジュールが見つかりません: " + query.scheduleId()));
 

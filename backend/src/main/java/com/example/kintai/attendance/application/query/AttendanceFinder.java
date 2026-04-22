@@ -1,4 +1,4 @@
-package com.example.kintai.attendance.domain.repository;
+package com.example.kintai.attendance.application.query;
 
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
 import com.example.kintai.shared.domain.model.EmployeeId;
@@ -12,13 +12,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * 勤怠サマリークエリリポジトリ — Read Model参照用インターフェース
+ * 勤怠ファインダー — Read Model 参照用インターフェース
  *
  * <p>CQRS（コマンドクエリ責務分離）の読み取り側を担当する。
  * 日次勤怠一覧、月次サマリー、部門ダッシュボードのデータを提供する。
- * Write Model（集約）とは独立したRead Modelテーブルから読み取る。</p>
+ * Write Model（集約）とは独立した Read Model テーブルから読み取る。</p>
+ *
+ * <p>アプリケーション層に配置することで、ドメイン層を書き込み側の責務に限定する。</p>
  */
-public interface AttendanceSummaryQueryRepository {
+public interface AttendanceFinder {
 
     // ========================
     // Read Model DTO定義
@@ -26,12 +28,16 @@ public interface AttendanceSummaryQueryRepository {
 
     /**
      * 日次勤怠サマリー — attendance_summariesテーブルの読み取り結果
+     *
+     * <p>{@code onBreak} は「現在休憩中か」の状態フラグ。Projector が
+     * BreakStarted/BreakEnded 等のイベントで更新する（review-009 指摘 #3 対応）。</p>
      */
     record DailySummary(
             UUID attendanceId,
             String employeeId,
             LocalDate workDate,
             String status,
+            boolean onBreak,
             Instant clockInTime,
             Instant clockOutTime,
             int scheduledMinutes,

@@ -68,7 +68,7 @@ public class WeeklyScheduleRepositoryImpl implements WeeklyScheduleRepository {
         WeeklyScheduleJpaEntity saved = jpaWeeklyScheduleRepo.saveAndFlush(entity);
 
         // 保存後のバージョンを反映したドメインオブジェクトを返す
-        return WeeklySchedule.reconstruct(
+        WeeklySchedule reconstructed = WeeklySchedule.reconstruct(
                 ScheduleId.of(saved.getId()),
                 EmployeeId.of(saved.getEmployeeId()),
                 saved.getWeekStartDate(),
@@ -78,6 +78,9 @@ public class WeeklyScheduleRepositoryImpl implements WeeklyScheduleRepository {
                 saved.getCreatedAt(),
                 saved.getUpdatedAt()
         );
+        // 元の集約に登録されたドメインイベントを引き継ぐ（reconstruct で失われないようにする）
+        reconstructed.inheritEventsFrom(schedule);
+        return reconstructed;
     }
 
     @Override

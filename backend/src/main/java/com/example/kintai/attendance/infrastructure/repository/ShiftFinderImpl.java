@@ -1,7 +1,7 @@
 package com.example.kintai.attendance.infrastructure.repository;
 
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
-import com.example.kintai.attendance.infrastructure.persistence.entity.ShiftPatternJpaEntity;
+import com.example.kintai.attendance.application.query.ShiftFinder;
+import com.example.kintai.attendance.infrastructure.persistence.entity.ShiftPatternSummaryJpaEntity;
 import com.example.kintai.attendance.infrastructure.persistence.entity.WeeklyScheduleSummaryJpaEntity;
 import com.example.kintai.shared.domain.model.EmployeeId;
 
@@ -17,21 +17,22 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * シフトクエリリポジトリ実装 — Read Model 参照用
+ * シフトファインダー実装 — Read Model 参照用
  *
  * <p>CQRS（コマンドクエリ責務分離）の読み取り側実装。
- * shift_patterns テーブルからパターン一覧を、
+ * shift_pattern_summaries テーブルからパターン一覧を、
  * weekly_schedule_summaries テーブルからカレンダービュー用データを取得する。
+ * Write Model（shift_patterns）には一切アクセスしない。
  * EntityManager を使用して JPQL クエリを実行する。</p>
  */
 @Repository
 @Transactional(readOnly = true)
-public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
+public class ShiftFinderImpl implements ShiftFinder {
 
     @PersistenceContext
     private final EntityManager entityManager;
 
-    public ShiftQueryRepositoryImpl(EntityManager entityManager) {
+    public ShiftFinderImpl(EntityManager entityManager) {
         this.entityManager = entityManager;
     }
 
@@ -43,13 +44,14 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
     @SuppressWarnings("unchecked")
     public List<PatternSummary> findPatterns(Boolean isActive) {
         // isActive: true=有効のみ, false=無効のみ, null=全件（論理削除を除外）
+        // Read Model（shift_pattern_summaries）を参照する
         String jpql;
         if (isActive != null) {
-            jpql = "SELECT p FROM ShiftPatternJpaEntity p " +
+            jpql = "SELECT p FROM ShiftPatternSummaryJpaEntity p " +
                     "WHERE p.isActive = :isActive AND p.deletedAt IS NULL " +
                     "ORDER BY p.name ASC";
         } else {
-            jpql = "SELECT p FROM ShiftPatternJpaEntity p " +
+            jpql = "SELECT p FROM ShiftPatternSummaryJpaEntity p " +
                     "WHERE p.deletedAt IS NULL " +
                     "ORDER BY p.name ASC";
         }
@@ -58,11 +60,11 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
         if (isActive != null) {
             query.setParameter("isActive", isActive);
         }
-        List<ShiftPatternJpaEntity> entities = query.getResultList();
+        List<ShiftPatternSummaryJpaEntity> entities = query.getResultList();
 
         // JPAエンティティ → PatternSummary DTOに変換
         List<PatternSummary> result = new ArrayList<>();
-        for (ShiftPatternJpaEntity e : entities) {
+        for (ShiftPatternSummaryJpaEntity e : entities) {
             result.add(toPatternSummary(e));
         }
         return result;
@@ -70,8 +72,9 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
 
     @Override
     public Optional<PatternSummary> findPatternById(UUID patternId) {
-        // shift_patternsテーブルからIDで検索
-        ShiftPatternJpaEntity entity = entityManager.find(ShiftPatternJpaEntity.class, patternId);
+        // shift_pattern_summariesテーブルから主キーで検索
+        ShiftPatternSummaryJpaEntity entity = entityManager.find(
+                ShiftPatternSummaryJpaEntity.class, patternId);
         return Optional.ofNullable(entity).map(this::toPatternSummary);
     }
 
@@ -150,10 +153,10 @@ public class ShiftQueryRepositoryImpl implements ShiftQueryRepository {
     // 変換メソッド
     // ========================
 
-    /** JPAエンティティ → PatternSummary DTOに変換 */
-    private PatternSummary toPatternSummary(ShiftPatternJpaEntity e) {
+    /** Read Model JPAエンティティ → PatternSummary DTO に変換 */
+    private PatternSummary toPatternSummary(ShiftPatternSummaryJpaEntity e) {
         return new PatternSummary(
-                e.getId(),
+                e.getShiftPatternId(),
                 e.getName(),
                 e.getStartTime().toString(),
                 e.getEndTime().toString(),

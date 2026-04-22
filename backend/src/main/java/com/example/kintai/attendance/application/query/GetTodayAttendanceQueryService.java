@@ -1,10 +1,6 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.model.AttendanceRecord;
-import com.example.kintai.attendance.domain.model.WorkDate;
-import com.example.kintai.attendance.domain.repository.AttendanceRecordRepository;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DailySummary;
+import com.example.kintai.attendance.application.query.AttendanceFinder.DailySummary;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +16,13 @@ import java.util.Optional;
  *
  * <p>処理フロー:
  * <ol>
- *   <li>当日の日次サマリーをRead Modelから取得する</li>
- *   <li>Write Modelから休憩中フラグを判定する</li>
- *   <li>TodayAttendanceResultに変換して返却する</li>
+ *   <li>当日の日次サマリーを Read Model から取得する</li>
+ *   <li>Read Model の {@code onBreak} フラグを含めて TodayAttendanceResult に変換して返却する</li>
  * </ol>
  * </p>
+ *
+ * <p>Read Model だけで完結するため、Write Model（AttendanceRecord 集約）へのアクセスは一切行わない。
+ * review-009 指摘 #3 対応: 休憩中判定のために clock_entries 全件をロードしていた無駄なコストを排除。</p>
  */
 @Service
 @Transactional(readOnly = true)
@@ -32,18 +30,11 @@ public class GetTodayAttendanceQueryService implements QueryService<GetTodayAtte
 
     private static final Logger log = LoggerFactory.getLogger(GetTodayAttendanceQueryService.class);
 
-    /** Read Modelクエリリポジトリ */
-    private final AttendanceSummaryQueryRepository queryRepository;
+    /** Read Model ファインダー */
+    private final AttendanceFinder finder;
 
-    /** Write Modelリポジトリ（休憩中フラグの判定に使用） */
-    private final AttendanceRecordRepository attendanceRecordRepository;
-
-    public GetTodayAttendanceQueryService(
-            AttendanceSummaryQueryRepository queryRepository,
-            AttendanceRecordRepository attendanceRecordRepository
-    ) {
-        this.queryRepository = queryRepository;
-        this.attendanceRecordRepository = attendanceRecordRepository;
+    public GetTodayAttendanceQueryService(AttendanceFinder finder) {
+        this.finder = finder;
     }
 
     /**
@@ -58,28 +49,22 @@ public class GetTodayAttendanceQueryService implements QueryService<GetTodayAtte
         log.debug("当日勤怠取得: employeeId={}, date={}", query.employeeId().value(), today);
 
         // 当日の日次サマリーを取得する（from=to=today で1件取得）
-        List<DailySummary> summaries = queryRepository.findDailySummaries(query.employeeId(), today, today);
+        List<DailySummary> summaries = finder.findDailySummaries(query.employeeId(), today, today);
 
         // 当日分がない場合は空を返す
         if (summaries.isEmpty()) {
             return Optional.empty();
         }
 
-        // DailySummary → TodayAttendanceResult に変換する
+        // DailySummary → TodayAttendanceResult に変換する（休憩中フラグも Read Model から取得）
         DailySummary s = summaries.getFirst();
-
-        // 書き込みモデルから休憩中フラグを取得する（打刻エントリの BREAK_START/END 数で判定）
-        boolean onBreak = attendanceRecordRepository
-                .findByEmployeeIdAndWorkDate(query.employeeId(), new WorkDate(today))
-                .map(AttendanceRecord::isOnBreak)
-                .orElse(false);
 
         return Optional.of(new TodayAttendanceResult(
                 s.attendanceId(),
                 s.employeeId(),
                 s.workDate(),
                 s.status(),
-                onBreak,
+                s.onBreak(),
                 s.clockInTime(),
                 s.clockOutTime(),
                 s.breakMinutes(),

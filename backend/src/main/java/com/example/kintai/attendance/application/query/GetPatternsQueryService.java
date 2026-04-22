@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository;
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.PatternSummary;
+import com.example.kintai.attendance.application.query.ShiftFinder.PatternSummary;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,11 +25,11 @@ public class GetPatternsQueryService implements QueryService<GetPatternsQuery, L
 
     private static final Logger log = LoggerFactory.getLogger(GetPatternsQueryService.class);
 
-    /** シフトクエリリポジトリ — Read Model参照用 */
-    private final ShiftQueryRepository shiftQueryRepository;
+    /** シフトファインダー — Read Model参照用 */
+    private final ShiftFinder shiftFinder;
 
-    public GetPatternsQueryService(ShiftQueryRepository shiftQueryRepository) {
-        this.shiftQueryRepository = shiftQueryRepository;
+    public GetPatternsQueryService(ShiftFinder shiftFinder) {
+        this.shiftFinder = shiftFinder;
     }
 
     /**
@@ -43,8 +42,8 @@ public class GetPatternsQueryService implements QueryService<GetPatternsQuery, L
     public List<PatternSummary> execute(GetPatternsQuery query) {
         log.debug("シフトパターン一覧取得: isActive={}", query.isActive());
 
-        // ShiftQueryRepositoryからパターンを取得する（名前昇順ソート済み）
-        List<PatternSummary> patterns = shiftQueryRepository.findPatterns(query.isActive());
+        // ShiftFinderからパターンを取得する（名前昇順ソート済み）
+        List<PatternSummary> patterns = shiftFinder.findPatterns(query.isActive());
 
         log.debug("シフトパターン一覧取得完了: {}件", patterns.size());
         return patterns;

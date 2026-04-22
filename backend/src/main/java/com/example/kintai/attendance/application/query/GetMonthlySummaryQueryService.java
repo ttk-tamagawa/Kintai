@@ -1,8 +1,7 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.MonthlySummary;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.PageResult;
+import com.example.kintai.attendance.application.query.AttendanceFinder.MonthlySummary;
+import com.example.kintai.attendance.application.query.AttendanceFinder.PageResult;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,11 +29,11 @@ public class GetMonthlySummaryQueryService implements QueryService<GetMonthlySum
 
     private static final Logger log = LoggerFactory.getLogger(GetMonthlySummaryQueryService.class);
 
-    /** Read Modelクエリリポジトリ */
-    private final AttendanceSummaryQueryRepository queryRepository;
+    /** Read Model ファインダー */
+    private final AttendanceFinder finder;
 
-    public GetMonthlySummaryQueryService(AttendanceSummaryQueryRepository queryRepository) {
-        this.queryRepository = queryRepository;
+    public GetMonthlySummaryQueryService(AttendanceFinder finder) {
+        this.finder = finder;
     }
 
     /**
@@ -53,12 +52,12 @@ public class GetMonthlySummaryQueryService implements QueryService<GetMonthlySum
 
         // 全従業員データを取得してKPIを集計する（ページネーション前の全データ）
         List<MonthlySummary> allSummaries =
-                queryRepository.findMonthlySummariesByDepartment(query.departmentId(), query.year(), query.month());
+                finder.findMonthlySummariesByDepartment(query.departmentId(), query.year(), query.month());
         MonthlySummaryKpi kpi = aggregateMonthlySummaryKpi(allSummaries);
 
         // ページネーション付きで従業員別データを取得する
         PageResult<MonthlySummary> pagedRaw =
-                queryRepository.findMonthlySummariesByDepartmentPaged(
+                finder.findMonthlySummariesByDepartmentPaged(
                         query.departmentId(), query.year(), query.month(), query.page(), query.size(), sort, dir);
 
         // 分→時間に変換した行データを作成する

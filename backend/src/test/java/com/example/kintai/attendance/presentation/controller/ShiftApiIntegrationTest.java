@@ -102,10 +102,11 @@ class ShiftApiIntegrationTest {
             return execution.execute(request, body);
         });
 
-        // テストデータをクリーンアップする
+        // テストデータをクリーンアップする（FK 順: weekly_schedule → shift_pattern_summaries → shift_patterns）
         jdbcTemplate.execute("DELETE FROM weekly_schedule_summaries");
         jdbcTemplate.execute("DELETE FROM weekly_schedule_events");
         jdbcTemplate.execute("DELETE FROM weekly_schedules");
+        jdbcTemplate.execute("DELETE FROM shift_pattern_summaries");
         jdbcTemplate.execute("DELETE FROM shift_patterns");
     }
 

@@ -1,4 +1,4 @@
-package com.example.kintai.attendance.domain.repository;
+package com.example.kintai.attendance.application.query;
 
 import com.example.kintai.shared.domain.model.EmployeeId;
 
@@ -9,13 +9,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * シフトクエリリポジトリ — Read Model参照用インターフェース
+ * シフトファインダー — Read Model 参照用インターフェース
  *
- * <p>CQRSの読み取り側を担当する。
+ * <p>CQRS の読み取り側を担当する。
  * シフトパターン一覧とカレンダービュー（週次スケジュール）のデータを提供する。
- * weekly_schedule_summariesテーブルからパターン名つきのデータを取得する。</p>
+ * weekly_schedule_summaries テーブルからパターン名つきのデータを取得する。</p>
+ *
+ * <p>アプリケーション層に配置することで、ドメイン層を書き込み側の責務に限定する。</p>
  */
-public interface ShiftQueryRepository {
+public interface ShiftFinder {
 
     // ========================
     // Read Model DTO定義

@@ -85,7 +85,7 @@ public class AttendanceRecordRepositoryImpl implements AttendanceRecordRepositor
         saveNewClockEntries(record);
 
         // 保存後のバージョンを反映したドメインオブジェクトを返す
-        return AttendanceRecord.reconstruct(
+        AttendanceRecord reconstructed = AttendanceRecord.reconstruct(
                 record.getId(),
                 record.getEmployeeId(),
                 record.getWorkDate(),
@@ -98,6 +98,9 @@ public class AttendanceRecordRepositoryImpl implements AttendanceRecordRepositor
                 record.getCreatedAt(),
                 saved.getUpdatedAt()
         );
+        // 元の集約に登録されたドメインイベントを引き継ぐ（reconstruct で失われないようにする）
+        reconstructed.inheritEventsFrom(record);
+        return reconstructed;
     }
 
     @Override

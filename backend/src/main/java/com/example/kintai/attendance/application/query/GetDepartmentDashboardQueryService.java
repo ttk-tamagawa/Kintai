@@ -1,8 +1,7 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DepartmentStats;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.PageResult;
+import com.example.kintai.attendance.application.query.AttendanceFinder.DepartmentStats;
+import com.example.kintai.attendance.application.query.AttendanceFinder.PageResult;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +32,11 @@ public class GetDepartmentDashboardQueryService implements QueryService<GetDepar
 
     private static final Logger log = LoggerFactory.getLogger(GetDepartmentDashboardQueryService.class);
 
-    /** Read Modelクエリリポジトリ */
-    private final AttendanceSummaryQueryRepository queryRepository;
+    /** Read Model ファインダー */
+    private final AttendanceFinder finder;
 
-    public GetDepartmentDashboardQueryService(AttendanceSummaryQueryRepository queryRepository) {
-        this.queryRepository = queryRepository;
+    public GetDepartmentDashboardQueryService(AttendanceFinder finder) {
+        this.finder = finder;
     }
 
     /**
@@ -52,7 +51,7 @@ public class GetDepartmentDashboardQueryService implements QueryService<GetDepar
                 query.departmentId(), query.year(), query.month(), query.page(), query.size());
 
         // 当月の部門統計を取得する
-        List<DepartmentStats> currentStats = queryRepository.findDepartmentStats(query.year(), query.month());
+        List<DepartmentStats> currentStats = finder.findDepartmentStats(query.year(), query.month());
 
         // 部門IDフィルタが指定されている場合は絞り込む
         if (query.departmentId() != null && !query.departmentId().isEmpty()) {
@@ -66,7 +65,7 @@ public class GetDepartmentDashboardQueryService implements QueryService<GetDepar
 
         // 前月の部門統計を取得してKPIを集計する
         YearMonth prevMonth = YearMonth.of(query.year(), query.month()).minusMonths(1);
-        List<DepartmentStats> prevStats = queryRepository.findDepartmentStats(
+        List<DepartmentStats> prevStats = finder.findDepartmentStats(
                 prevMonth.getYear(), prevMonth.getMonthValue());
         if (query.departmentId() != null && !query.departmentId().isEmpty()) {
             prevStats = prevStats.stream()

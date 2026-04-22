@@ -1,6 +1,6 @@
 package com.example.kintai.attendance.infrastructure.repository;
 
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
+import com.example.kintai.attendance.application.query.AttendanceFinder;
 import com.example.kintai.attendance.infrastructure.persistence.entity.AttendanceSummaryJpaEntity;
 import com.example.kintai.attendance.infrastructure.persistence.entity.MonthlySummaryJpaEntity;
 import com.example.kintai.shared.domain.model.AttendanceRecordId;
@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 勤怠サマリークエリリポジトリ実装 — Read Model参照用
+ * 勤怠ファインダー実装 — Read Model 参照用
  *
  * <p>CQRS（コマンドクエリ責務分離）の読み取り側実装。
  * attendance_summaries、monthly_attendance_summaries、
@@ -29,7 +29,7 @@ import java.util.Optional;
  */
 @Repository
 @Transactional(readOnly = true)
-public class AttendanceSummaryQueryRepositoryImpl implements AttendanceSummaryQueryRepository {
+public class AttendanceFinderImpl implements AttendanceFinder {
 
     @PersistenceContext
     private final EntityManager entityManager;
@@ -51,7 +51,7 @@ public class AttendanceSummaryQueryRepositoryImpl implements AttendanceSummaryQu
             "totalOvertimeHours", "m.totalOvertimeMinutes"
     );
 
-    public AttendanceSummaryQueryRepositoryImpl(EntityManager entityManager) {
+    public AttendanceFinderImpl(EntityManager entityManager) {
         this.entityManager = entityManager;
     }
 
@@ -266,6 +266,7 @@ public class AttendanceSummaryQueryRepositoryImpl implements AttendanceSummaryQu
                 e.getEmployeeId(),
                 e.getWorkDate(),
                 e.getStatus(),
+                e.isOnBreak(),
                 e.getClockInTime(),
                 e.getClockOutTime(),
                 e.getScheduledMinutes(),

@@ -71,4 +71,32 @@ public abstract class AggregateRoot {
     public void clearDomainEvents() {
         domainEvents.clear();
     }
+
+    /**
+     * 別の集約からドメインイベントを引き継ぐ — リポジトリ実装の {@code save()} で使用する
+     *
+     * <p>リポジトリの {@code save()} が {@code reconstruct()} で新しいインスタンスを返す際、
+     * 元の集約に登録されていたイベントが失われないよう、再構築後のインスタンスに
+     * 本メソッドでイベントを引き継がせる。</p>
+     *
+     * <p>典型的な使用例:
+     * <pre>{@code
+     * XxxRepositoryImpl#save(Xxx aggregate) {
+     *     jpaRepo.saveAndFlush(toEntity(aggregate));
+     *     Xxx reconstructed = Xxx.reconstruct(...);
+     *     reconstructed.inheritEventsFrom(aggregate);  // ← イベントを引き継ぐ
+     *     return reconstructed;
+     * }
+     * }</pre>
+     * </p>
+     *
+     * @param source イベントの引き継ぎ元となる集約（通常は save() の引数）
+     * @throws IllegalArgumentException source が null の場合
+     */
+    public void inheritEventsFrom(AggregateRoot source) {
+        if (source == null) {
+            throw new IllegalArgumentException("イベント引き継ぎ元の集約は null にできません");
+        }
+        this.domainEvents.addAll(source.domainEvents);
+    }
 }

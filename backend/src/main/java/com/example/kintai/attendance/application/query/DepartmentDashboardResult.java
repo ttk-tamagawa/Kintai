@@ -1,6 +1,6 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.PageResult;
+import com.example.kintai.attendance.application.query.AttendanceFinder.PageResult;
 
 /**
  * 部門ダッシュボード結果 — 当月KPI + 前月KPI + 部門別テーブル（ページネーション付き）

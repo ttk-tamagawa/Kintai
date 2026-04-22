@@ -1,6 +1,8 @@
 package com.example.kintai.attendance.domain.model.shift;
 
+import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternDeactivatedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternDefinedEvent;
+import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternReactivatedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -228,6 +230,23 @@ class ShiftPatternTest {
             );
             assertEquals("パターンは既に無効化されています", exception.getMessage());
         }
+
+        @Test
+        @DisplayName("正常系: 無効化時に ShiftPatternDeactivatedEvent が登録される")
+        void 無効化時にイベントが登録される() {
+            // 準備: ACTIVEなパターンを作成（define で 1 件イベント登録済み）
+            ShiftPattern pattern = createStandardDayPattern();
+
+            // 実行: 無効化する
+            pattern.deactivate();
+
+            // 検証: ドメインイベントが計 2 件（Defined + Deactivated）登録されていること
+            assertEquals(2, pattern.getDomainEvents().size(),
+                    "Defined + Deactivated の 2 件が登録されること");
+            assertInstanceOf(ShiftPatternDeactivatedEvent.class,
+                    pattern.getDomainEvents().get(1),
+                    "2 件目は ShiftPatternDeactivatedEvent であること");
+        }
     }
 
     // ========================
@@ -284,6 +303,24 @@ class ShiftPatternTest {
                     () -> pattern.reactivate()
             );
             assertEquals("パターンは既に有効です", exception.getMessage());
+        }
+
+        @Test
+        @DisplayName("正常系: 再有効化時に ShiftPatternReactivatedEvent が登録される")
+        void 再有効化時にイベントが登録される() {
+            // 準備: パターンを無効化した状態にする（Defined + Deactivated の 2 件登録済み）
+            ShiftPattern pattern = createStandardDayPattern();
+            pattern.deactivate();
+
+            // 実行: 再有効化する
+            pattern.reactivate();
+
+            // 検証: ドメインイベントが計 3 件（Defined + Deactivated + Reactivated）登録されていること
+            assertEquals(3, pattern.getDomainEvents().size(),
+                    "Defined + Deactivated + Reactivated の 3 件が登録されること");
+            assertInstanceOf(ShiftPatternReactivatedEvent.class,
+                    pattern.getDomainEvents().get(2),
+                    "3 件目は ShiftPatternReactivatedEvent であること");
         }
     }
 

@@ -77,6 +77,10 @@ public class AttendanceSummaryJpaEntity {
     @Column(name = "total_overtime_minutes", nullable = false)
     private int totalOvertimeMinutes;
 
+    /** 休憩中フラグ — 現在休憩中の場合 true（Projector が BreakStarted/BreakEnded 等で更新する） */
+    @Column(name = "is_on_break", nullable = false)
+    private boolean isOnBreak;
+
     /** 最終イベント日時 */
     @Column(name = "last_event_at")
     private Instant lastEventAt;
@@ -131,6 +135,7 @@ public class AttendanceSummaryJpaEntity {
         this.lateNightMinutes = 0;
         this.holidayMinutes = 0;
         this.totalOvertimeMinutes = 0;
+        this.isOnBreak = false;
         this.eventCount = 0;
         Instant now = Instant.now();
         this.createdAt = now;
@@ -155,6 +160,7 @@ public class AttendanceSummaryJpaEntity {
     public int getLateNightMinutes() { return lateNightMinutes; }
     public int getHolidayMinutes() { return holidayMinutes; }
     public int getTotalOvertimeMinutes() { return totalOvertimeMinutes; }
+    public boolean isOnBreak() { return isOnBreak; }
     public Instant getLastEventAt() { return lastEventAt; }
     public int getEventCount() { return eventCount; }
     /** 更新日時を取得する */
@@ -184,6 +190,8 @@ public class AttendanceSummaryJpaEntity {
     public void setHolidayMinutes(int holidayMinutes) { this.holidayMinutes = holidayMinutes; }
     /** 残業合計時間（分）を設定する */
     public void setTotalOvertimeMinutes(int v) { this.totalOvertimeMinutes = v; }
+    /** 休憩中フラグを設定する */
+    public void setOnBreak(boolean isOnBreak) { this.isOnBreak = isOnBreak; }
     /** 最終イベント日時を設定する */
     public void setLastEventAt(Instant lastEventAt) { this.lastEventAt = lastEventAt; }
     /** イベント数を設定する */

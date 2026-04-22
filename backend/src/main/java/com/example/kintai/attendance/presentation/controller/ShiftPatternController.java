@@ -10,7 +10,7 @@ import com.example.kintai.attendance.application.query.GetPatternQuery;
 import com.example.kintai.attendance.application.query.GetPatternQueryService;
 import com.example.kintai.attendance.application.query.GetPatternsQuery;
 import com.example.kintai.attendance.application.query.GetPatternsQueryService;
-import com.example.kintai.attendance.domain.repository.ShiftQueryRepository.PatternSummary;
+import com.example.kintai.attendance.application.query.ShiftFinder.PatternSummary;
 import com.example.kintai.attendance.presentation.dto.DefinePatternRequest;
 import com.example.kintai.attendance.presentation.dto.PatternResponse;
 import com.example.kintai.shared.domain.model.ShiftPatternId;

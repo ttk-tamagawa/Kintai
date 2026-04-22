@@ -89,7 +89,8 @@ public class AttendanceSummaryProjector {
      * 退勤打刻イベントを処理する
      *
      * <p>ステータスをCLOCKED_OUTに変更し、退勤時刻を記録する。
-     * 勤務時間の計算はWorkDurationCalculatedEventで別途処理される。</p>
+     * 勤務時間の計算はWorkDurationCalculatedEventで別途処理される。
+     * 退勤時点で休憩中フラグを false にする（防御的: 退勤 = 確実に休憩中ではない）。</p>
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -104,6 +105,9 @@ public class AttendanceSummaryProjector {
         entity.setStatus("CLOCKED_OUT");
         entity.setClockOutTime(event.clockTime().value());
 
+        // 休憩中フラグをリセットする（退勤 = 休憩中ではない）
+        entity.setOnBreak(false);
+
         // イベント追跡情報を更新する
         updateEventTracking(entity, event.occurredAt());
     }
@@ -115,7 +119,8 @@ public class AttendanceSummaryProjector {
     /**
      * 休憩開始イベントを処理する
      *
-     * <p>イベント数を加算する。休憩時間はBreakEndedEventで更新される。</p>
+     * <p>休憩中フラグを true にし、イベント数を加算する。
+     * 休憩時間はBreakEndedEventで更新される。</p>
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -125,7 +130,10 @@ public class AttendanceSummaryProjector {
         AttendanceSummaryJpaEntity entity = findExisting(event.attendanceRecordId().value());
         if (entity == null) return;
 
-        // イベント追跡情報のみ更新する
+        // 休憩中フラグを true にする
+        entity.setOnBreak(true);
+
+        // イベント追跡情報を更新する
         updateEventTracking(entity, event.occurredAt());
     }
 
@@ -136,7 +144,8 @@ public class AttendanceSummaryProjector {
     /**
      * 休憩終了イベントを処理する
      *
-     * <p>今回の休憩時間を累計に加算する。複数回の休憩に対応するため加算方式。</p>
+     * <p>休憩中フラグを false にし、今回の休憩時間を累計に加算する。
+     * 複数回の休憩に対応するため加算方式。</p>
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -146,6 +155,9 @@ public class AttendanceSummaryProjector {
 
         AttendanceSummaryJpaEntity entity = findExisting(event.attendanceRecordId().value());
         if (entity == null) return;
+
+        // 休憩中フラグを false にする
+        entity.setOnBreak(false);
 
         // 今回の休憩時間を累計に加算する
         entity.setBreakMinutes(entity.getBreakMinutes() + event.breakMinutes());
@@ -266,7 +278,8 @@ public class AttendanceSummaryProjector {
      * 勤怠確定イベントを処理する
      *
      * <p>月次本締めにより勤怠記録が確定された際に、
-     * ステータスをFINALIZEDに変更する。月次サマリーの再集計もトリガーする。</p>
+     * ステータスをFINALIZEDに変更する。月次サマリーの再集計もトリガーする。
+     * 確定済み record は休憩中ではないため is_on_break を false にリセットする（防御的）。</p>
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -279,6 +292,9 @@ public class AttendanceSummaryProjector {
 
         // ステータスをFINALIZEDに変更する
         entity.setStatus("FINALIZED");
+
+        // 休憩中フラグをリセットする（確定済み = 休憩中ではない）
+        entity.setOnBreak(false);
 
         // イベント追跡情報を更新する
         updateEventTracking(entity, event.occurredAt());

@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.DepartmentStats;
+import com.example.kintai.attendance.application.query.AttendanceFinder.DepartmentStats;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +32,11 @@ public class ExportDepartmentDashboardQueryService implements QueryService<Expor
     /** UTF-8 BOM — ExcelでのCSV文字化け防止 */
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
-    /** Read Modelクエリリポジトリ */
-    private final AttendanceSummaryQueryRepository queryRepository;
+    /** Read Model ファインダー */
+    private final AttendanceFinder finder;
 
-    public ExportDepartmentDashboardQueryService(AttendanceSummaryQueryRepository queryRepository) {
-        this.queryRepository = queryRepository;
+    public ExportDepartmentDashboardQueryService(AttendanceFinder finder) {
+        this.finder = finder;
     }
 
     /**
@@ -52,7 +51,7 @@ public class ExportDepartmentDashboardQueryService implements QueryService<Expor
                 query.departmentId(), query.year(), query.month());
 
         // 全部門統計を取得する
-        List<DepartmentStats> stats = queryRepository.findDepartmentStats(query.year(), query.month());
+        List<DepartmentStats> stats = finder.findDepartmentStats(query.year(), query.month());
 
         // 部門IDフィルタが指定されている場合は絞り込む
         if (query.departmentId() != null && !query.departmentId().isEmpty()) {

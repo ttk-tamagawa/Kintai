@@ -4,9 +4,11 @@ import com.example.kintai.attendance.domain.model.shift.ShiftPattern;
 import com.example.kintai.attendance.domain.repository.ShiftPatternRepository;
 import com.example.kintai.shared.domain.exception.ResourceNotFoundException;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
+import com.example.kintai.shared.kernel.contract.DomainEvent;
 import com.example.kintai.shared.kernel.contract.UseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,8 +32,15 @@ public class ReactivatePatternUseCase implements UseCase<ReactivatePatternComman
     /** シフトパターンリポジトリ — パターンのCRUD操作 */
     private final ShiftPatternRepository shiftPatternRepository;
 
-    public ReactivatePatternUseCase(ShiftPatternRepository shiftPatternRepository) {
+    /** Springイベント発行 — プロジェクターがRead Modelを更新するトリガー */
+    private final ApplicationEventPublisher eventPublisher;
+
+    public ReactivatePatternUseCase(
+            ShiftPatternRepository shiftPatternRepository,
+            ApplicationEventPublisher eventPublisher
+    ) {
         this.shiftPatternRepository = shiftPatternRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -47,11 +56,17 @@ public class ReactivatePatternUseCase implements UseCase<ReactivatePatternComman
         log.debug("シフトパターン再有効化: patternId={}, name={}",
                 command.patternId().value(), pattern.getName().value());
 
-        // 集約のreactivate()を呼び出す（ガード: INACTIVEであること）
+        // 集約のreactivate()を呼び出す（ガード: INACTIVEであること、ドメインイベントを登録）
         pattern.reactivate();
 
         // リポジトリに保存する（楽観的ロックでバージョン管理）
-        shiftPatternRepository.save(pattern);
+        ShiftPattern saved = shiftPatternRepository.save(pattern);
+
+        // 集約に蓄積されたドメインイベントを一括で発行する（Projector が Read Model を更新する）
+        for (DomainEvent event : saved.getDomainEvents()) {
+            eventPublisher.publishEvent(event);
+        }
+        saved.clearDomainEvents();
 
         log.debug("シフトパターン再有効化完了: patternId={}", command.patternId().value());
         return null;

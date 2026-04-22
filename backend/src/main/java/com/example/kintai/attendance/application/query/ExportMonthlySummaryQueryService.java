@@ -1,7 +1,6 @@
 package com.example.kintai.attendance.application.query;
 
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository;
-import com.example.kintai.attendance.domain.repository.AttendanceSummaryQueryRepository.MonthlySummary;
+import com.example.kintai.attendance.application.query.AttendanceFinder.MonthlySummary;
 import com.example.kintai.shared.kernel.contract.QueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,11 +30,11 @@ public class ExportMonthlySummaryQueryService implements QueryService<ExportMont
     /** UTF-8 BOM — ExcelでのCSV文字化け防止 */
     private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
-    /** Read Modelクエリリポジトリ */
-    private final AttendanceSummaryQueryRepository queryRepository;
+    /** Read Model ファインダー */
+    private final AttendanceFinder finder;
 
-    public ExportMonthlySummaryQueryService(AttendanceSummaryQueryRepository queryRepository) {
-        this.queryRepository = queryRepository;
+    public ExportMonthlySummaryQueryService(AttendanceFinder finder) {
+        this.finder = finder;
     }
 
     /**
@@ -51,7 +50,7 @@ public class ExportMonthlySummaryQueryService implements QueryService<ExportMont
 
         // 全従業員データを取得する（ページネーションなし）
         List<MonthlySummary> summaries =
-                queryRepository.findMonthlySummariesByDepartment(query.departmentId(), query.year(), query.month());
+                finder.findMonthlySummariesByDepartment(query.departmentId(), query.year(), query.month());
 
         // CSV文字列を組み立てる
         StringBuilder csv = new StringBuilder();

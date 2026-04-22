@@ -1,6 +1,8 @@
 package com.example.kintai.attendance.domain.model.shift;
 
+import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternDeactivatedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternDefinedEvent;
+import com.example.kintai.attendance.domain.model.shift.event.ShiftPatternReactivatedEvent;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import com.example.kintai.shared.kernel.contract.AggregateRoot;
 
@@ -150,9 +152,9 @@ public class ShiftPattern extends AggregateRoot {
                 now
         );
 
-        // シフトパターン定義イベントを登録する
+        // シフトパターン定義イベントを登録する（Read Model 同期用に全フィールドを含める）
         pattern.registerEvent(ShiftPatternDefinedEvent.of(
-                pattern.id, name, startTime, endTime, isOvernight
+                pattern.id, name, startTime, endTime, breakMinutes, isOvernight
         ));
 
         return pattern;
@@ -180,6 +182,9 @@ public class ShiftPattern extends AggregateRoot {
         // 有効フラグをOFFにする
         isActive = false;
         updatedAt = Instant.now();
+
+        // シフトパターン無効化イベントを登録する（Read Model 同期用）
+        registerEvent(ShiftPatternDeactivatedEvent.of(id, name));
     }
 
     /**
@@ -198,6 +203,9 @@ public class ShiftPattern extends AggregateRoot {
         // 有効フラグをONにする
         isActive = true;
         updatedAt = Instant.now();
+
+        // シフトパターン再有効化イベントを登録する（Read Model 同期用）
+        registerEvent(ShiftPatternReactivatedEvent.of(id, name));
     }
 
     // ========================
