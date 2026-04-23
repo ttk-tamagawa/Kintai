@@ -198,7 +198,8 @@ class AttendanceQueryControllerIntegrationTest {
         @DisplayName("テストデータ投入後、ページネーション付きでデータを返す")
         void returnsPaginatedDataWithTestData() {
             // テスト用データを準備する
-            UUID employeeId = UUID.randomUUID();
+            // V11 で employees.id を VARCHAR(36) に変更したため、従業員IDは String で扱う
+            String employeeId = UUID.randomUUID().toString();
             LocalDate today = LocalDate.now();
             UUID attendanceId = UUID.randomUUID();
             Instant clockInTime = today.atTime(9, 0).toInstant(ZoneOffset.ofHours(9));
@@ -298,7 +299,8 @@ class AttendanceQueryControllerIntegrationTest {
         @DisplayName("月次テストデータ投入後、KPIと従業員データを返す")
         void returns200WithKpiAndEmployeeData() {
             // テスト用データを準備する
-            UUID employeeId = UUID.randomUUID();
+            // V11 で employees.id を VARCHAR(36) に変更したため、従業員IDは String で扱う
+            String employeeId = UUID.randomUUID().toString();
             String departmentId = "dept-001";
             int year = LocalDate.now().getYear();
             int month = LocalDate.now().getMonthValue();

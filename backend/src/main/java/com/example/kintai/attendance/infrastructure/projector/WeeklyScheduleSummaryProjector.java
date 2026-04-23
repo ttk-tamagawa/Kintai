@@ -4,10 +4,14 @@ import com.example.kintai.attendance.domain.model.shift.event.SchedulePublishedE
 import com.example.kintai.attendance.domain.model.shift.event.ScheduleUnpublishedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftAssignedEvent;
 import com.example.kintai.attendance.domain.model.shift.event.ShiftChangedEvent;
+import com.example.kintai.attendance.infrastructure.jooq.generated.tables.records.WeeklyScheduleSummariesRecord;
 import com.example.kintai.attendance.infrastructure.persistence.entity.ShiftPatternJpaEntity;
-import com.example.kintai.attendance.infrastructure.persistence.entity.WeeklyScheduleSummaryJpaEntity;
 import com.example.kintai.shared.domain.model.ShiftPatternId;
 import jakarta.persistence.EntityManager;
+import org.jooq.DSLContext;
+import org.jooq.InsertSetMoreStep;
+import org.jooq.TableField;
+import org.jooq.UpdateSetMoreStep;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -18,18 +22,25 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static com.example.kintai.attendance.infrastructure.jooq.generated.Tables.WEEKLY_SCHEDULE_SUMMARIES;
+
 /**
  * 週次スケジュールサマリープロジェクター — シフトイベントを購読してweekly_schedule_summariesを更新する
  *
  * <p>シフト割当・変更のドメインイベントを {@code @TransactionalEventListener} で購読し、
- * Read Model（weekly_schedule_summaries）をUPSERTする。
- * パターン名をshift_patternsから取得して非正規化し、JOINなしでカレンダー表示を可能にする。</p>
+ * Read Model（weekly_schedule_summaries）を jOOQ で UPSERT / UPDATE する。
+ * パターン名を shift_patterns から取得して非正規化し、JOINなしでカレンダー表示を可能にする。</p>
+ *
+ * <p>shift_patterns は Write Model（集約）のテーブルのため、パターン名取得は JPA EntityManager を使用する。
+ * Read Model（weekly_schedule_summaries）の更新は jOOQ で型安全に行う。</p>
  *
  * <p>設計書: 30_設計/データベース/シフト.md の「リードモデル同期方式」に対応</p>
  *
@@ -47,11 +58,21 @@ public class WeeklyScheduleSummaryProjector {
 
     private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleSummaryProjector.class);
     private static final String SYSTEM_USER = "system";
+    /** プロジェクトの TZ 方針に従い、Instant → OffsetDateTime 変換は Asia/Tokyo で行う */
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Tokyo");
 
+    /** パターン名が shift_patterns から取得できなかった場合のフォールバック表示名 */
+    private static final String UNKNOWN_PATTERN_NAME = "不明";
+
+    /** Write Model（shift_patterns）のパターン名取得に使用 */
     private final EntityManager entityManager;
 
-    public WeeklyScheduleSummaryProjector(EntityManager entityManager) {
+    /** Read Model（weekly_schedule_summaries）の操作に使用 */
+    private final DSLContext dsl;
+
+    public WeeklyScheduleSummaryProjector(EntityManager entityManager, DSLContext dsl) {
         this.entityManager = entityManager;
+        this.dsl = dsl;
     }
 
     // ========================================
@@ -70,28 +91,39 @@ public class WeeklyScheduleSummaryProjector {
         log.debug("ShiftAssignedEvent受信: scheduleId={}, status={}",
                 event.scheduleId().value(), event.status());
 
-        // 新規サマリーエンティティを作成する（EmployeeId の文字列値を使用）
-        WeeklyScheduleSummaryJpaEntity entity = new WeeklyScheduleSummaryJpaEntity(
-                event.scheduleId().value(),
-                event.employeeId().value(),
-                event.weekStartDate(),
-                event.status().name()
-        );
-
         // 割当パターンの名前をshift_patternsから一括取得する
         Map<UUID, String> patternNames = lookupPatternNames(event.assignments().values());
 
-        // 7曜日分のパターンID・パターン名をエンティティに設定する
-        applyAssignments(entity, event.assignments(), patternNames);
+        OffsetDateTime occurredAt = toOffsetDateTime(event.occurredAt());
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
 
-        // 割当日数を計算する（パターンが割り当てられている曜日の数）
-        entity.setAssignedDays(event.assignments().size());
+        // INSERT 文を構築 — 基本カラムとメタ情報を set する
+        InsertSetMoreStep<WeeklyScheduleSummariesRecord> insert = dsl.insertInto(WEEKLY_SCHEDULE_SUMMARIES)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.WEEKLY_SCHEDULE_ID, event.scheduleId().value())
+                .set(WEEKLY_SCHEDULE_SUMMARIES.EMPLOYEE_ID, event.employeeId().value())
+                .set(WEEKLY_SCHEDULE_SUMMARIES.WEEK_START_DATE, event.weekStartDate())
+                .set(WEEKLY_SCHEDULE_SUMMARIES.STATUS, event.status().name())
+                .set(WEEKLY_SCHEDULE_SUMMARIES.ASSIGNED_DAYS, event.assignments().size())
+                .set(WEEKLY_SCHEDULE_SUMMARIES.LAST_EVENT_AT, occurredAt)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.EVENT_COUNT, 1)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.CREATED_AT, now)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.UPDATED_AT, now)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.CREATED_BY, SYSTEM_USER)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.UPDATED_BY, SYSTEM_USER);
 
-        // イベント追跡情報を設定する
-        entity.setLastEventAt(event.occurredAt());
-        entity.setEventCount(1);
+        // 7曜日分のパターンID・パターン名を set する（割当がない曜日は null のまま残る）
+        for (DayOfWeek day : DayOfWeek.values()) {
+            ShiftPatternId assigned = event.assignments().get(day);
+            UUID patternId = assigned != null ? assigned.value() : null;
+            String patternName = patternId != null
+                    ? patternNames.getOrDefault(patternId, UNKNOWN_PATTERN_NAME)
+                    : null;
+            insert = insert
+                    .set(patternIdField(day), patternId)
+                    .set(patternNameField(day), patternName);
+        }
 
-        entityManager.persist(entity);
+        insert.execute();
 
         log.debug("新規サマリー作成完了: scheduleId={}, assignedDays={}",
                 event.scheduleId().value(), event.assignments().size());
@@ -105,41 +137,50 @@ public class WeeklyScheduleSummaryProjector {
      * シフト変更イベントを処理する
      *
      * <p>既存のweekly_schedule_summariesを更新する。
-     * 変更後の全割当でパターンID・パターン名を上書きし、
-     * ステータスをDRAFTに戻す（PUBLISHEDだった場合、再公開が必要）。</p>
+     * 7曜日すべてを一度 null に上書きしてから新しい割当を設定するため、
+     * 割当から外れた曜日は自動的にクリアされる。
+     * ステータスはDRAFTに戻す（PUBLISHEDだった場合、再公開が必要）。</p>
      */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void on(ShiftChangedEvent event) {
         log.debug("ShiftChangedEvent受信: scheduleId={}", event.scheduleId().value());
 
-        // 既存のサマリーを取得する
-        WeeklyScheduleSummaryJpaEntity entity = entityManager.find(
-                WeeklyScheduleSummaryJpaEntity.class, event.scheduleId().value());
-
-        if (entity == null) {
-            log.warn("サマリーが見つかりません: scheduleId={}", event.scheduleId().value());
-            return;
-        }
-
         // 割当パターンの名前をshift_patternsから一括取得する
         Map<UUID, String> patternNames = lookupPatternNames(event.changedDays().values());
 
-        // 7曜日すべてをリセットしてから新しい割当を設定する
-        clearAllDayAssignments(entity);
-        applyAssignments(entity, event.changedDays(), patternNames);
+        OffsetDateTime occurredAt = toOffsetDateTime(event.occurredAt());
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
 
-        // ステータスをDRAFTに戻す（変更したので再公開が必要）
-        entity.setStatus("DRAFT");
+        // UPDATE 文を構築 — まずはメタ情報を set する
+        UpdateSetMoreStep<WeeklyScheduleSummariesRecord> update = dsl.update(WEEKLY_SCHEDULE_SUMMARIES)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.STATUS, "DRAFT")
+                .set(WEEKLY_SCHEDULE_SUMMARIES.ASSIGNED_DAYS, event.changedDays().size())
+                .set(WEEKLY_SCHEDULE_SUMMARIES.LAST_EVENT_AT, occurredAt)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.EVENT_COUNT, WEEKLY_SCHEDULE_SUMMARIES.EVENT_COUNT.plus(1))
+                .set(WEEKLY_SCHEDULE_SUMMARIES.UPDATED_AT, now)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.UPDATED_BY, SYSTEM_USER);
 
-        // 割当日数を再計算する
-        entity.setAssignedDays(event.changedDays().size());
+        // 7曜日分のパターンID・パターン名を set する（割当がない曜日は明示的に null にする）
+        for (DayOfWeek day : DayOfWeek.values()) {
+            ShiftPatternId assigned = event.changedDays().get(day);
+            UUID patternId = assigned != null ? assigned.value() : null;
+            String patternName = patternId != null
+                    ? patternNames.getOrDefault(patternId, UNKNOWN_PATTERN_NAME)
+                    : null;
+            update = update
+                    .set(patternIdField(day), patternId)
+                    .set(patternNameField(day), patternName);
+        }
 
-        // イベント追跡情報を更新する
-        entity.setLastEventAt(event.occurredAt());
-        entity.setEventCount(entity.getEventCount() + 1);
-        entity.setUpdatedAt(Instant.now());
-        entity.setUpdatedBy(SYSTEM_USER);
+        int updated = update
+                .where(WEEKLY_SCHEDULE_SUMMARIES.WEEKLY_SCHEDULE_ID.eq(event.scheduleId().value()))
+                .execute();
+
+        if (updated == 0) {
+            log.warn("サマリーが見つかりません: scheduleId={}", event.scheduleId().value());
+            return;
+        }
 
         log.debug("サマリー更新完了: scheduleId={}, assignedDays={}",
                 event.scheduleId().value(), event.changedDays().size());
@@ -159,21 +200,11 @@ public class WeeklyScheduleSummaryProjector {
     public void on(SchedulePublishedEvent event) {
         log.debug("SchedulePublishedEvent受信: scheduleId={}", event.scheduleId().value());
 
-        // 既存のサマリーを取得する
-        WeeklyScheduleSummaryJpaEntity entity = entityManager.find(
-                WeeklyScheduleSummaryJpaEntity.class, event.scheduleId().value());
-
-        if (entity == null) {
+        int updated = updateStatus(event.scheduleId().value(), "PUBLISHED", event.occurredAt());
+        if (updated == 0) {
             log.warn("サマリーが見つかりません: scheduleId={}", event.scheduleId().value());
             return;
         }
-
-        // ステータスをPUBLISHEDに更新する
-        entity.setStatus("PUBLISHED");
-        entity.setLastEventAt(event.occurredAt());
-        entity.setEventCount(entity.getEventCount() + 1);
-        entity.setUpdatedAt(Instant.now());
-        entity.setUpdatedBy(SYSTEM_USER);
 
         log.debug("サマリー公開完了: scheduleId={}", event.scheduleId().value());
     }
@@ -192,147 +223,101 @@ public class WeeklyScheduleSummaryProjector {
     public void on(ScheduleUnpublishedEvent event) {
         log.debug("ScheduleUnpublishedEvent受信: scheduleId={}", event.scheduleId().value());
 
-        // 既存のサマリーを取得する
-        WeeklyScheduleSummaryJpaEntity entity = entityManager.find(
-                WeeklyScheduleSummaryJpaEntity.class, event.scheduleId().value());
-
-        if (entity == null) {
+        int updated = updateStatus(event.scheduleId().value(), "DRAFT", event.occurredAt());
+        if (updated == 0) {
             log.warn("サマリーが見つかりません: scheduleId={}", event.scheduleId().value());
             return;
         }
-
-        // ステータスをDRAFTに更新する
-        entity.setStatus("DRAFT");
-        entity.setLastEventAt(event.occurredAt());
-        entity.setEventCount(entity.getEventCount() + 1);
-        entity.setUpdatedAt(Instant.now());
-        entity.setUpdatedBy(SYSTEM_USER);
 
         log.debug("サマリー非公開完了: scheduleId={}", event.scheduleId().value());
     }
 
     // ========================================
-    // パターン名検索
+    // ヘルパー
     // ========================================
+
+    /**
+     * ステータスと監査情報を一括更新する
+     *
+     * @return 更新行数（0 なら対象が見つからなかったことを示す）
+     */
+    private int updateStatus(UUID scheduleId, String newStatus, Instant occurredAt) {
+        return dsl.update(WEEKLY_SCHEDULE_SUMMARIES)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.STATUS, newStatus)
+                .set(WEEKLY_SCHEDULE_SUMMARIES.LAST_EVENT_AT, toOffsetDateTime(occurredAt))
+                .set(WEEKLY_SCHEDULE_SUMMARIES.EVENT_COUNT, WEEKLY_SCHEDULE_SUMMARIES.EVENT_COUNT.plus(1))
+                .set(WEEKLY_SCHEDULE_SUMMARIES.UPDATED_AT, OffsetDateTime.now(APP_ZONE))
+                .set(WEEKLY_SCHEDULE_SUMMARIES.UPDATED_BY, SYSTEM_USER)
+                .where(WEEKLY_SCHEDULE_SUMMARIES.WEEKLY_SCHEDULE_ID.eq(scheduleId))
+                .execute();
+    }
 
     /**
      * シフトパターンIDの集合からパターン名を一括取得する
      *
-     * <p>shift_patternsテーブルをIN句で検索し、ID→名前のマップを返す。
-     * サマリーにパターン名を非正規化するため、割当のたびに最新名を取得する。</p>
+     * <p>shift_patterns は Write Model 集約のテーブルのため、JPA（EntityManager）で参照する。
+     * IDが重複する可能性もあるため、toMap の merge 関数で重複キーを許容する。</p>
      *
      * @param patternIds パターンIDの集合
      * @return パターンID(UUID) → パターン名(String) のマップ
      */
     private Map<UUID, String> lookupPatternNames(Collection<ShiftPatternId> patternIds) {
-        // パターンIDをUUIDのリストに変換する
         List<UUID> ids = patternIds.stream()
                 .map(ShiftPatternId::value)
+                .distinct()
                 .toList();
 
         if (ids.isEmpty()) {
             return Map.of();
         }
 
-        // shift_patternsから名前を一括取得する
         List<ShiftPatternJpaEntity> patterns = entityManager.createQuery(
-                "SELECT p FROM ShiftPatternJpaEntity p WHERE p.id IN :ids",
-                ShiftPatternJpaEntity.class
-        )
-        .setParameter("ids", ids)
-        .getResultList();
+                        "SELECT p FROM ShiftPatternJpaEntity p WHERE p.id IN :ids",
+                        ShiftPatternJpaEntity.class)
+                .setParameter("ids", ids)
+                .getResultList();
 
-        // ID → 名前のマップに変換する
         return patterns.stream()
                 .collect(Collectors.toMap(
                         ShiftPatternJpaEntity::getId,
-                        ShiftPatternJpaEntity::getName));
-    }
-
-    // ========================================
-    // 曜日別割当の設定・クリア
-    // ========================================
-
-    /**
-     * 曜日別の割当（パターンID・パターン名）をエンティティに設定する
-     *
-     * <p>ドメインのMap&lt;DayOfWeek, ShiftPatternId&gt;をJPAエンティティの
-     * 7曜日×2カラム（ID+名前）に変換して設定する。</p>
-     *
-     * @param entity       対象のサマリーエンティティ
-     * @param assignments  曜日ごとのパターンID割当
-     * @param patternNames パターンID→名前のマップ
-     */
-    private void applyAssignments(WeeklyScheduleSummaryJpaEntity entity,
-                                   Map<DayOfWeek, ShiftPatternId> assignments,
-                                   Map<UUID, String> patternNames) {
-        // 各曜日について、割当があればパターンIDと名前を設定する
-        for (Map.Entry<DayOfWeek, ShiftPatternId> entry : assignments.entrySet()) {
-            UUID patternId = entry.getValue().value();
-            String patternName = patternNames.getOrDefault(patternId, "不明");
-            setDayAssignment(entity, entry.getKey(), patternId, patternName);
-        }
+                        ShiftPatternJpaEntity::getName,
+                        (a, b) -> a));
     }
 
     /**
-     * 指定曜日のパターンID・パターン名をエンティティに設定する
-     *
-     * <p>DayOfWeekに対応するセッターを呼び出してカラム値を設定する。</p>
+     * 曜日 → パターンID カラムのマッピング
      */
-    private void setDayAssignment(WeeklyScheduleSummaryJpaEntity entity,
-                                   DayOfWeek day, UUID patternId, String patternName) {
-        switch (day) {
-            case MONDAY -> {
-                entity.setMondayPatternId(patternId);
-                entity.setMondayPatternName(patternName);
-            }
-            case TUESDAY -> {
-                entity.setTuesdayPatternId(patternId);
-                entity.setTuesdayPatternName(patternName);
-            }
-            case WEDNESDAY -> {
-                entity.setWednesdayPatternId(patternId);
-                entity.setWednesdayPatternName(patternName);
-            }
-            case THURSDAY -> {
-                entity.setThursdayPatternId(patternId);
-                entity.setThursdayPatternName(patternName);
-            }
-            case FRIDAY -> {
-                entity.setFridayPatternId(patternId);
-                entity.setFridayPatternName(patternName);
-            }
-            case SATURDAY -> {
-                entity.setSaturdayPatternId(patternId);
-                entity.setSaturdayPatternName(patternName);
-            }
-            case SUNDAY -> {
-                entity.setSundayPatternId(patternId);
-                entity.setSundayPatternName(patternName);
-            }
-        }
+    private static TableField<WeeklyScheduleSummariesRecord, UUID> patternIdField(DayOfWeek day) {
+        return switch (day) {
+            case MONDAY -> WEEKLY_SCHEDULE_SUMMARIES.MONDAY_PATTERN_ID;
+            case TUESDAY -> WEEKLY_SCHEDULE_SUMMARIES.TUESDAY_PATTERN_ID;
+            case WEDNESDAY -> WEEKLY_SCHEDULE_SUMMARIES.WEDNESDAY_PATTERN_ID;
+            case THURSDAY -> WEEKLY_SCHEDULE_SUMMARIES.THURSDAY_PATTERN_ID;
+            case FRIDAY -> WEEKLY_SCHEDULE_SUMMARIES.FRIDAY_PATTERN_ID;
+            case SATURDAY -> WEEKLY_SCHEDULE_SUMMARIES.SATURDAY_PATTERN_ID;
+            case SUNDAY -> WEEKLY_SCHEDULE_SUMMARIES.SUNDAY_PATTERN_ID;
+        };
     }
 
     /**
-     * 7曜日すべてのパターンID・パターン名をnullにリセットする
-     *
-     * <p>シフト変更時に全曜日をクリアしてから新しい割当を適用するために使用する。
-     * 割当がない曜日（休み）はnullのまま残る。</p>
+     * 曜日 → パターン名カラムのマッピング
      */
-    private void clearAllDayAssignments(WeeklyScheduleSummaryJpaEntity entity) {
-        entity.setMondayPatternId(null);
-        entity.setMondayPatternName(null);
-        entity.setTuesdayPatternId(null);
-        entity.setTuesdayPatternName(null);
-        entity.setWednesdayPatternId(null);
-        entity.setWednesdayPatternName(null);
-        entity.setThursdayPatternId(null);
-        entity.setThursdayPatternName(null);
-        entity.setFridayPatternId(null);
-        entity.setFridayPatternName(null);
-        entity.setSaturdayPatternId(null);
-        entity.setSaturdayPatternName(null);
-        entity.setSundayPatternId(null);
-        entity.setSundayPatternName(null);
+    private static TableField<WeeklyScheduleSummariesRecord, String> patternNameField(DayOfWeek day) {
+        return switch (day) {
+            case MONDAY -> WEEKLY_SCHEDULE_SUMMARIES.MONDAY_PATTERN_NAME;
+            case TUESDAY -> WEEKLY_SCHEDULE_SUMMARIES.TUESDAY_PATTERN_NAME;
+            case WEDNESDAY -> WEEKLY_SCHEDULE_SUMMARIES.WEDNESDAY_PATTERN_NAME;
+            case THURSDAY -> WEEKLY_SCHEDULE_SUMMARIES.THURSDAY_PATTERN_NAME;
+            case FRIDAY -> WEEKLY_SCHEDULE_SUMMARIES.FRIDAY_PATTERN_NAME;
+            case SATURDAY -> WEEKLY_SCHEDULE_SUMMARIES.SATURDAY_PATTERN_NAME;
+            case SUNDAY -> WEEKLY_SCHEDULE_SUMMARIES.SUNDAY_PATTERN_NAME;
+        };
+    }
+
+    /**
+     * Instant を Asia/Tokyo の OffsetDateTime に変換する
+     */
+    private static OffsetDateTime toOffsetDateTime(Instant instant) {
+        return instant.atZone(APP_ZONE).toOffsetDateTime();
     }
 }

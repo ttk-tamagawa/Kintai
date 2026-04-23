@@ -108,27 +108,29 @@ class AttendanceCommandControllerIntegrationTest {
         };
 
         for (UUID employeeId : testEmployees) {
+            // V11 で employees.id を VARCHAR(36) に変更したため、jdbcTemplate には文字列で渡す
+            String employeeIdStr = employeeId.toString();
             // attendance_summariesを削除（読み取りモデル）
             jdbcTemplate.update(
                     "DELETE FROM attendance_summaries WHERE employee_id = ?",
-                    employeeId
+                    employeeIdStr
             );
             // clock_entriesを削除（打刻ログ。attendances.idを参照するFK）
             jdbcTemplate.update(
                     "DELETE FROM clock_entries WHERE attendance_id IN " +
                             "(SELECT id FROM attendances WHERE employee_id = ?)",
-                    employeeId
+                    employeeIdStr
             );
             // attendance_eventsを削除（イベントログ。attendances.idを参照するFK）
             jdbcTemplate.update(
                     "DELETE FROM attendance_events WHERE attendance_id IN " +
                             "(SELECT id FROM attendances WHERE employee_id = ?)",
-                    employeeId
+                    employeeIdStr
             );
             // attendancesを削除（集約ルート）
             jdbcTemplate.update(
                     "DELETE FROM attendances WHERE employee_id = ?",
-                    employeeId
+                    employeeIdStr
             );
         }
     }
@@ -163,7 +165,8 @@ class AttendanceCommandControllerIntegrationTest {
         ClockInResponse body = response.getBody();
         assertNotNull(body, "レスポンスボディがnullでないこと");
         assertNotNull(body.attendanceId(), "勤怠記録IDが返ること");
-        assertEquals(EMPLOYEE_CLOCK_IN, body.employeeId(), "従業員IDが一致すること");
+        // V11 で employees.id を VARCHAR(36) に変更したため、レスポンスの employeeId は String
+        assertEquals(EMPLOYEE_CLOCK_IN.toString(), body.employeeId(), "従業員IDが一致すること");
         assertEquals("CLOCKED_IN", body.status(), "ステータスがCLOCKED_INであること");
         assertNotNull(body.clockIn(), "出勤時刻が返ること");
         assertEquals("WEB", body.source(), "打刻元がWEBであること");
@@ -275,10 +278,12 @@ class AttendanceCommandControllerIntegrationTest {
                 "Step4: 休憩時間が60分であること");
 
         // === DBの検証: attendancesテーブルにレコードが存在すること ===
+        // V11 で employees.id を VARCHAR(36) に変更したため、jdbcTemplate には文字列で渡す
+        String fullFlowId = EMPLOYEE_FULL_FLOW.toString();
         Integer attendanceCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM attendances WHERE employee_id = ?",
                 Integer.class,
-                EMPLOYEE_FULL_FLOW
+                fullFlowId
         );
         assertEquals(1, attendanceCount,
                 "DB検証: attendancesテーブルにレコードが1件存在すること");
@@ -287,7 +292,7 @@ class AttendanceCommandControllerIntegrationTest {
         String dbStatus = jdbcTemplate.queryForObject(
                 "SELECT status FROM attendances WHERE employee_id = ?",
                 String.class,
-                EMPLOYEE_FULL_FLOW
+                fullFlowId
         );
         assertEquals("CLOCKED_OUT", dbStatus,
                 "DB検証: ステータスがCLOCKED_OUTであること");
@@ -297,7 +302,7 @@ class AttendanceCommandControllerIntegrationTest {
                 "SELECT COUNT(*) FROM clock_entries WHERE attendance_id IN " +
                         "(SELECT id FROM attendances WHERE employee_id = ?)",
                 Integer.class,
-                EMPLOYEE_FULL_FLOW
+                fullFlowId
         );
         assertEquals(4, clockEntryCount,
                 "DB検証: clock_entriesに4件（出勤・休憩開始・休憩終了・退勤）の打刻ログがあること");

@@ -275,7 +275,9 @@ public class WeeklyScheduleController {
      * @return スケジュール一覧
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER')")
+    // EMPLOYEE は自分のemployeeIdのみアクセス可、MANAGER は全員アクセス可。
+    // employeeId=null（全件取得）は MANAGER のみ許可（EMPLOYEE が null 指定で他人データを見るのを防ぐ）
+    @PreAuthorize("(hasRole('MANAGER')) or (hasRole('EMPLOYEE') and #employeeId != null and @accessControl.canAccessEmployee(authentication, #employeeId))")
     public ResponseEntity<List<ScheduleResponse>> getSchedules(
             @RequestParam(required = false) UUID employeeId,
             @RequestParam(required = false) LocalDate weekFrom,

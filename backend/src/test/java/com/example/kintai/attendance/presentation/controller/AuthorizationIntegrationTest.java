@@ -452,17 +452,8 @@ class AuthorizationIntegrationTest {
                     headersWithRoles("EMPLOYEE")));
         }
 
-        // --- GET /department-dashboard — hasAnyRole('MANAGER', 'HR') ---
-
-        @Test
-        @DisplayName("GET /department-dashboard — MANAGER → 認可通過")
-        void departmentDashboard_manager_allowed() {
-            HttpStatusCode status = get(
-                    "/api/v1/attendances/department-dashboard?yearMonth=2026-02",
-                    headersWithRoles("MANAGER"));
-            assertNotEquals(HttpStatus.FORBIDDEN, status);
-            assertNotEquals(HttpStatus.UNAUTHORIZED, status);
-        }
+        // --- GET /department-dashboard — hasAnyRole('HR', 'ADMIN') ---
+        // 設計書「ロール別画面アクセスマトリクス」: 部門別勤怠ダッシュボード は HR と ADMIN のみ
 
         @Test
         @DisplayName("GET /department-dashboard — HR → 認可通過")
@@ -470,6 +461,16 @@ class AuthorizationIntegrationTest {
             HttpStatusCode status = get(
                     "/api/v1/attendances/department-dashboard?yearMonth=2026-02",
                     headersWithRoles("HR"));
+            assertNotEquals(HttpStatus.FORBIDDEN, status);
+            assertNotEquals(HttpStatus.UNAUTHORIZED, status);
+        }
+
+        @Test
+        @DisplayName("GET /department-dashboard — ADMIN → 認可通過")
+        void departmentDashboard_admin_allowed() {
+            HttpStatusCode status = get(
+                    "/api/v1/attendances/department-dashboard?yearMonth=2026-02",
+                    headersWithRoles("ADMIN"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
@@ -483,31 +484,41 @@ class AuthorizationIntegrationTest {
         }
 
         @Test
-        @DisplayName("GET /department-dashboard — ADMINのみ → 403")
-        void departmentDashboard_adminOnly_forbidden() {
+        @DisplayName("GET /department-dashboard — MANAGERのみ → 403")
+        void departmentDashboard_managerOnly_forbidden() {
             assertEquals(HttpStatus.FORBIDDEN, get(
                     "/api/v1/attendances/department-dashboard?yearMonth=2026-02",
-                    headersWithRoles("ADMIN")));
+                    headersWithRoles("MANAGER")));
         }
 
-        // --- GET /department-dashboard/export — hasAnyRole('MANAGER', 'HR') ---
+        // --- GET /department-dashboard/export — hasAnyRole('HR', 'ADMIN') ---
 
         @Test
-        @DisplayName("GET /department-dashboard/export — MANAGER → 認可通過")
-        void departmentDashboardExport_manager_allowed() {
+        @DisplayName("GET /department-dashboard/export — HR → 認可通過")
+        void departmentDashboardExport_hr_allowed() {
             HttpStatusCode status = get(
                     "/api/v1/attendances/department-dashboard/export?yearMonth=2026-02",
-                    headersWithRoles("MANAGER"));
+                    headersWithRoles("HR"));
             assertNotEquals(HttpStatus.FORBIDDEN, status);
             assertNotEquals(HttpStatus.UNAUTHORIZED, status);
         }
 
         @Test
-        @DisplayName("GET /department-dashboard/export — ADMINのみ → 403")
-        void departmentDashboardExport_adminOnly_forbidden() {
+        @DisplayName("GET /department-dashboard/export — ADMIN → 認可通過")
+        void departmentDashboardExport_admin_allowed() {
+            HttpStatusCode status = get(
+                    "/api/v1/attendances/department-dashboard/export?yearMonth=2026-02",
+                    headersWithRoles("ADMIN"));
+            assertNotEquals(HttpStatus.FORBIDDEN, status);
+            assertNotEquals(HttpStatus.UNAUTHORIZED, status);
+        }
+
+        @Test
+        @DisplayName("GET /department-dashboard/export — MANAGERのみ → 403")
+        void departmentDashboardExport_managerOnly_forbidden() {
             assertEquals(HttpStatus.FORBIDDEN, get(
                     "/api/v1/attendances/department-dashboard/export?yearMonth=2026-02",
-                    headersWithRoles("ADMIN")));
+                    headersWithRoles("MANAGER")));
         }
     }
 

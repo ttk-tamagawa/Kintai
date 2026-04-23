@@ -1,20 +1,23 @@
 package com.example.kintai.attendance.infrastructure.repository;
 
 import com.example.kintai.attendance.application.query.ShiftFinder;
-import com.example.kintai.attendance.infrastructure.persistence.entity.ShiftPatternSummaryJpaEntity;
-import com.example.kintai.attendance.infrastructure.persistence.entity.WeeklyScheduleSummaryJpaEntity;
+import com.example.kintai.attendance.infrastructure.jooq.generated.tables.records.ShiftPatternSummariesRecord;
 import com.example.kintai.shared.domain.model.EmployeeId;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
+import org.jooq.Condition;
+import org.jooq.DSLContext;
+import org.jooq.Record;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import static com.example.kintai.attendance.infrastructure.jooq.generated.Tables.EMPLOYEES;
+import static com.example.kintai.attendance.infrastructure.jooq.generated.Tables.SHIFT_PATTERN_SUMMARIES;
+import static com.example.kintai.attendance.infrastructure.jooq.generated.Tables.WEEKLY_SCHEDULE_SUMMARIES;
 
 /**
  * シフトファインダー実装 — Read Model 参照用
@@ -23,17 +26,20 @@ import java.util.UUID;
  * shift_pattern_summaries テーブルからパターン一覧を、
  * weekly_schedule_summaries テーブルからカレンダービュー用データを取得する。
  * Write Model（shift_patterns）には一切アクセスしない。
- * EntityManager を使用して JPQL クエリを実行する。</p>
+ * jOOQ DSL で型安全に SQL を組み立てる。</p>
  */
 @Repository
 @Transactional(readOnly = true)
 public class ShiftFinderImpl implements ShiftFinder {
 
-    @PersistenceContext
-    private final EntityManager entityManager;
+    /** カラム別名: employees テーブルの name を employee_name として取得するための識別子 */
+    private static final String EMPLOYEE_NAME_ALIAS = "employee_name";
 
-    public ShiftFinderImpl(EntityManager entityManager) {
-        this.entityManager = entityManager;
+    /** jOOQ DSLContext — 型安全な SQL アクセス */
+    private final DSLContext dsl;
+
+    public ShiftFinderImpl(DSLContext dsl) {
+        this.dsl = dsl;
     }
 
     // ========================
@@ -41,41 +47,29 @@ public class ShiftFinderImpl implements ShiftFinder {
     // ========================
 
     @Override
-    @SuppressWarnings("unchecked")
     public List<PatternSummary> findPatterns(Boolean isActive) {
-        // isActive: true=有効のみ, false=無効のみ, null=全件（論理削除を除外）
-        // Read Model（shift_pattern_summaries）を参照する
-        String jpql;
+        // 論理削除されていないレコードだけを対象に、isActive フィルタを条件合成する
+        // isActive: true=有効のみ, false=無効のみ, null=全件
+        Condition condition = SHIFT_PATTERN_SUMMARIES.DELETED_AT.isNull();
         if (isActive != null) {
-            jpql = "SELECT p FROM ShiftPatternSummaryJpaEntity p " +
-                    "WHERE p.isActive = :isActive AND p.deletedAt IS NULL " +
-                    "ORDER BY p.name ASC";
-        } else {
-            jpql = "SELECT p FROM ShiftPatternSummaryJpaEntity p " +
-                    "WHERE p.deletedAt IS NULL " +
-                    "ORDER BY p.name ASC";
+            condition = condition.and(SHIFT_PATTERN_SUMMARIES.IS_ACTIVE.eq(isActive));
         }
 
-        var query = entityManager.createQuery(jpql);
-        if (isActive != null) {
-            query.setParameter("isActive", isActive);
-        }
-        List<ShiftPatternSummaryJpaEntity> entities = query.getResultList();
-
-        // JPAエンティティ → PatternSummary DTOに変換
-        List<PatternSummary> result = new ArrayList<>();
-        for (ShiftPatternSummaryJpaEntity e : entities) {
-            result.add(toPatternSummary(e));
-        }
-        return result;
+        // 型安全な jOOQ DSL でクエリを組み立てる（カラム名 typo はコンパイル時に検出される）
+        return dsl.selectFrom(SHIFT_PATTERN_SUMMARIES)
+                .where(condition)
+                .orderBy(SHIFT_PATTERN_SUMMARIES.NAME.asc())
+                .fetch()
+                .map(this::toPatternSummary);
     }
 
     @Override
     public Optional<PatternSummary> findPatternById(UUID patternId) {
-        // shift_pattern_summariesテーブルから主キーで検索
-        ShiftPatternSummaryJpaEntity entity = entityManager.find(
-                ShiftPatternSummaryJpaEntity.class, patternId);
-        return Optional.ofNullable(entity).map(this::toPatternSummary);
+        // shift_pattern_summaries テーブルから主キーで検索する
+        return dsl.selectFrom(SHIFT_PATTERN_SUMMARIES)
+                .where(SHIFT_PATTERN_SUMMARIES.SHIFT_PATTERN_ID.eq(patternId))
+                .fetchOptional()
+                .map(this::toPatternSummary);
     }
 
     // ========================
@@ -83,109 +77,90 @@ public class ShiftFinderImpl implements ShiftFinder {
     // ========================
 
     @Override
-    @SuppressWarnings("unchecked")
     public List<ScheduleSummary> findSchedules(EmployeeId employeeId, LocalDate from, LocalDate to) {
         // 従業員IDと期間で週次スケジュールサマリーを取得し、employeesテーブルからemployeeNameを結合する
-        List<Object[]> rows = entityManager.createQuery(
-                "SELECT s, e.name FROM WeeklyScheduleSummaryJpaEntity s " +
-                "LEFT JOIN EmployeeJpaEntity e ON s.employeeId = e.employeeId " +
-                "WHERE s.employeeId = :employeeId " +
-                "AND s.weekStartDate BETWEEN :from AND :to " +
-                "AND s.deletedAt IS NULL " +
-                "ORDER BY s.weekStartDate DESC"
-        )
-                .setParameter("employeeId", employeeId.value())
-                .setParameter("from", from)
-                .setParameter("to", to)
-                .getResultList();
-
-        // JPAエンティティ + employeeName → ScheduleSummary DTOに変換
-        List<ScheduleSummary> result = new ArrayList<>();
-        for (Object[] row : rows) {
-            result.add(toScheduleSummary((WeeklyScheduleSummaryJpaEntity) row[0], (String) row[1]));
-        }
-        return result;
+        return dsl.select(WEEKLY_SCHEDULE_SUMMARIES.asterisk(), EMPLOYEES.NAME.as(EMPLOYEE_NAME_ALIAS))
+                .from(WEEKLY_SCHEDULE_SUMMARIES)
+                .leftJoin(EMPLOYEES)
+                    .on(WEEKLY_SCHEDULE_SUMMARIES.EMPLOYEE_ID.eq(EMPLOYEES.EMPLOYEE_ID))
+                .where(WEEKLY_SCHEDULE_SUMMARIES.EMPLOYEE_ID.eq(employeeId.value()))
+                .and(WEEKLY_SCHEDULE_SUMMARIES.WEEK_START_DATE.between(from, to))
+                .and(WEEKLY_SCHEDULE_SUMMARIES.DELETED_AT.isNull())
+                .orderBy(WEEKLY_SCHEDULE_SUMMARIES.WEEK_START_DATE.desc())
+                .fetch(this::toScheduleSummary);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public List<ScheduleSummary> findAllSchedules(LocalDate from, LocalDate to) {
         // 全従業員の週次スケジュールサマリーを期間で取得し、employeesテーブルからemployeeNameを結合する
-        List<Object[]> rows = entityManager.createQuery(
-                "SELECT s, e.name FROM WeeklyScheduleSummaryJpaEntity s " +
-                "LEFT JOIN EmployeeJpaEntity e ON s.employeeId = e.employeeId " +
-                "WHERE s.weekStartDate BETWEEN :from AND :to " +
-                "AND s.deletedAt IS NULL " +
-                "ORDER BY s.weekStartDate ASC, s.employeeId ASC"
-        )
-                .setParameter("from", from)
-                .setParameter("to", to)
-                .getResultList();
-
-        // JPAエンティティ + employeeName → ScheduleSummary DTOに変換
-        List<ScheduleSummary> result = new ArrayList<>();
-        for (Object[] row : rows) {
-            result.add(toScheduleSummary((WeeklyScheduleSummaryJpaEntity) row[0], (String) row[1]));
-        }
-        return result;
+        return dsl.select(WEEKLY_SCHEDULE_SUMMARIES.asterisk(), EMPLOYEES.NAME.as(EMPLOYEE_NAME_ALIAS))
+                .from(WEEKLY_SCHEDULE_SUMMARIES)
+                .leftJoin(EMPLOYEES)
+                    .on(WEEKLY_SCHEDULE_SUMMARIES.EMPLOYEE_ID.eq(EMPLOYEES.EMPLOYEE_ID))
+                .where(WEEKLY_SCHEDULE_SUMMARIES.WEEK_START_DATE.between(from, to))
+                .and(WEEKLY_SCHEDULE_SUMMARIES.DELETED_AT.isNull())
+                .orderBy(WEEKLY_SCHEDULE_SUMMARIES.WEEK_START_DATE.asc(), WEEKLY_SCHEDULE_SUMMARIES.EMPLOYEE_ID.asc())
+                .fetch(this::toScheduleSummary);
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<ScheduleSummary> findScheduleById(UUID scheduleId) {
         // weekly_schedule_summariesテーブルからIDで検索し、employeesテーブルからemployeeNameを結合する
-        List<Object[]> rows = entityManager.createQuery(
-                "SELECT s, e.name FROM WeeklyScheduleSummaryJpaEntity s " +
-                "LEFT JOIN EmployeeJpaEntity e ON s.employeeId = e.employeeId " +
-                "WHERE s.weeklyScheduleId = :scheduleId AND s.deletedAt IS NULL"
-        )
-                .setParameter("scheduleId", scheduleId)
-                .getResultList();
-
-        if (rows.isEmpty()) {
-            return Optional.empty();
-        }
-        Object[] row = rows.getFirst();
-        return Optional.of(toScheduleSummary((WeeklyScheduleSummaryJpaEntity) row[0], (String) row[1]));
+        return dsl.select(WEEKLY_SCHEDULE_SUMMARIES.asterisk(), EMPLOYEES.NAME.as(EMPLOYEE_NAME_ALIAS))
+                .from(WEEKLY_SCHEDULE_SUMMARIES)
+                .leftJoin(EMPLOYEES)
+                    .on(WEEKLY_SCHEDULE_SUMMARIES.EMPLOYEE_ID.eq(EMPLOYEES.EMPLOYEE_ID))
+                .where(WEEKLY_SCHEDULE_SUMMARIES.WEEKLY_SCHEDULE_ID.eq(scheduleId))
+                .and(WEEKLY_SCHEDULE_SUMMARIES.DELETED_AT.isNull())
+                .fetchOptional(this::toScheduleSummary);
     }
 
     // ========================
     // 変換メソッド
     // ========================
 
-    /** Read Model JPAエンティティ → PatternSummary DTO に変換 */
-    private PatternSummary toPatternSummary(ShiftPatternSummaryJpaEntity e) {
+    /** jOOQ Record → PatternSummary DTO に変換 */
+    private PatternSummary toPatternSummary(ShiftPatternSummariesRecord r) {
         return new PatternSummary(
-                e.getShiftPatternId(),
-                e.getName(),
-                e.getStartTime().toString(),
-                e.getEndTime().toString(),
-                e.getBreakMinutes(),
-                e.isOvernight(),
-                e.isActive(),
-                e.getCreatedAt(),
-                e.getUpdatedAt()
+                r.getShiftPatternId(),
+                r.getName(),
+                r.getStartTime().toString(),
+                r.getEndTime().toString(),
+                r.getBreakMinutes(),
+                r.getIsOvernight(),
+                r.getIsActive(),
+                r.getCreatedAt().toInstant(),
+                r.getUpdatedAt().toInstant()
         );
     }
 
-    /** JPAエンティティ + employeeName → ScheduleSummary DTOに変換 */
-    private ScheduleSummary toScheduleSummary(WeeklyScheduleSummaryJpaEntity e, String employeeName) {
+    /** jOOQ Record (WSS + employees JOIN) → ScheduleSummary DTO に変換 */
+    private ScheduleSummary toScheduleSummary(Record r) {
+        // employees が見つからなかった場合は空文字をデフォルトにする（LEFT JOIN のため）
+        String employeeName = r.get(EMPLOYEE_NAME_ALIAS, String.class);
         return new ScheduleSummary(
-                e.getWeeklyScheduleId(),
-                e.getEmployeeId(),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.WEEKLY_SCHEDULE_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.EMPLOYEE_ID),
                 employeeName != null ? employeeName : "",
-                e.getWeekStartDate(),
-                e.getStatus(),
-                e.getMondayPatternId(), e.getMondayPatternName(),
-                e.getTuesdayPatternId(), e.getTuesdayPatternName(),
-                e.getWednesdayPatternId(), e.getWednesdayPatternName(),
-                e.getThursdayPatternId(), e.getThursdayPatternName(),
-                e.getFridayPatternId(), e.getFridayPatternName(),
-                e.getSaturdayPatternId(), e.getSaturdayPatternName(),
-                e.getSundayPatternId(), e.getSundayPatternName(),
-                e.getAssignedDays(),
-                e.getCreatedAt(),
-                e.getUpdatedAt()
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.WEEK_START_DATE),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.STATUS),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.MONDAY_PATTERN_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.MONDAY_PATTERN_NAME),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.TUESDAY_PATTERN_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.TUESDAY_PATTERN_NAME),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.WEDNESDAY_PATTERN_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.WEDNESDAY_PATTERN_NAME),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.THURSDAY_PATTERN_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.THURSDAY_PATTERN_NAME),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.FRIDAY_PATTERN_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.FRIDAY_PATTERN_NAME),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.SATURDAY_PATTERN_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.SATURDAY_PATTERN_NAME),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.SUNDAY_PATTERN_ID),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.SUNDAY_PATTERN_NAME),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.ASSIGNED_DAYS),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.CREATED_AT).toInstant(),
+                r.get(WEEKLY_SCHEDULE_SUMMARIES.UPDATED_AT).toInstant()
         );
     }
 }

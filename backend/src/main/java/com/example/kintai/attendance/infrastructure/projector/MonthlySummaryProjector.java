@@ -1,22 +1,30 @@
 package com.example.kintai.attendance.infrastructure.projector;
 
-import com.example.kintai.attendance.infrastructure.persistence.entity.MonthlySummaryJpaEntity;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.NoResultException;
+import org.jooq.DSLContext;
+import org.jooq.DatePart;
+import org.jooq.Record2;
+import org.jooq.Record6;
+import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
+
+import static com.example.kintai.attendance.infrastructure.jooq.generated.Tables.ATTENDANCE_SUMMARIES;
+import static com.example.kintai.attendance.infrastructure.jooq.generated.Tables.EMPLOYEES;
+import static com.example.kintai.attendance.infrastructure.jooq.generated.Tables.MONTHLY_ATTENDANCE_SUMMARIES;
 
 /**
  * 月次勤怠サマリープロジェクター — 日次サマリー変更時に月次集計を更新する
  *
- * <p>AttendanceSummaryProjectorから呼び出され、
- * attendance_summariesの集計結果をmonthly_attendance_summariesにUPSERTする。
- * 更新後にDepartmentStatsRefresherを呼び出してマテリアライズドビューをリフレッシュする。</p>
+ * <p>AttendanceSummaryProjector から呼び出され、
+ * attendance_summaries の集計結果を monthly_attendance_summaries に UPSERT する。
+ * 更新後に DepartmentStatsRefresher を呼び出してマテリアライズドビューをリフレッシュする。</p>
  *
  * <p>設計書: 30_設計/データベース/勤怠記録.md の「monthly_attendance_summaries」に対応</p>
  */
@@ -25,13 +33,18 @@ public class MonthlySummaryProjector {
 
     private static final Logger log = LoggerFactory.getLogger(MonthlySummaryProjector.class);
     private static final String SYSTEM_USER = "system";
+    /** プロジェクトの TZ 方針に従い、OffsetDateTime 生成は Asia/Tokyo で行う */
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Tokyo");
 
-    private final EntityManager entityManager;
+    /** jOOQ DSLContext — 型安全な SQL アクセス */
+    private final DSLContext dsl;
+
+    /** マテリアライズドビューのリフレッシュに使用 */
     private final DepartmentStatsRefresher departmentStatsRefresher;
 
-    public MonthlySummaryProjector(EntityManager entityManager,
+    public MonthlySummaryProjector(DSLContext dsl,
                                    DepartmentStatsRefresher departmentStatsRefresher) {
-        this.entityManager = entityManager;
+        this.dsl = dsl;
         this.departmentStatsRefresher = departmentStatsRefresher;
     }
 
@@ -39,8 +52,8 @@ public class MonthlySummaryProjector {
      * 指定従業員の指定月の月次サマリーを再集計する
      *
      * <p>日次サマリー（attendance_summaries）から集計値を算出し、
-     * 月次サマリー（monthly_attendance_summaries）をUPSERTする。
-     * 従業員名・部門IDはemployeesテーブルから取得して非正規化する。</p>
+     * 月次サマリー（monthly_attendance_summaries）を UPSERT する。
+     * 従業員名・部門ID は employees テーブルから取得して非正規化する。</p>
      *
      * @param employeeId 従業員ID（文字列）
      * @param workDate   基準となる勤務日（年月の特定に使用）
@@ -52,47 +65,58 @@ public class MonthlySummaryProjector {
         log.debug("月次サマリー再集計: employeeId={}, year={}, month={}", employeeId, year, month);
 
         // ---- 1. 日次サマリーから月次集計値を算出する ----
-        Object[] aggregation = aggregateDailySummaries(employeeId, year, month);
-        if (aggregation == null) {
+        Aggregation agg = aggregateDailySummaries(employeeId, year, month);
+        if (agg == null) {
             log.debug("集計対象の日次サマリーなし: employeeId={}", employeeId);
             return;
         }
 
-        // 集計結果を取り出す（null安全にゼロ変換）
-        int totalWorkDays = toInt(aggregation[0]);
-        int totalWorkMinutes = toInt(aggregation[1]);
-        int totalOvertimeMinutes = toInt(aggregation[2]);
-        int totalLateNightMinutes = toInt(aggregation[3]);
-        int totalHolidayMinutes = toInt(aggregation[4]);
-        int totalBreakMinutes = toInt(aggregation[5]);
-
         // ---- 2. 従業員名・部門IDをemployeesテーブルから取得する ----
-        Object[] employeeInfo = lookupEmployeeInfo(employeeId);
-        if (employeeInfo == null) {
+        EmployeeInfo emp = lookupEmployeeInfo(employeeId);
+        if (emp == null) {
             log.warn("従業員情報が見つかりません: employeeId={}", employeeId);
             return;
         }
-        String employeeName = (String) employeeInfo[0];
-        String departmentId = (String) employeeInfo[1];
 
-        // ---- 3. 月次サマリーをUPSERTする ----
-        MonthlySummaryJpaEntity entity = findOrCreateMonthlySummary(
-                employeeId, employeeName, departmentId, year, month);
-
-        // 集計値を設定する
-        entity.setTotalWorkDays(totalWorkDays);
-        entity.setTotalWorkMinutes(totalWorkMinutes);
-        entity.setTotalOvertimeMinutes(totalOvertimeMinutes);
-        entity.setTotalLateNightMinutes(totalLateNightMinutes);
-        entity.setTotalHolidayMinutes(totalHolidayMinutes);
-        entity.setTotalBreakMinutes(totalBreakMinutes);
-        entity.setUpdatedAt(Instant.now());
-        entity.setUpdatedBy(SYSTEM_USER);
-
-        entityManager.merge(entity);
+        // ---- 3. 月次サマリーを UPSERT する（UNIQUE: employee_id + year + month）----
+        OffsetDateTime now = OffsetDateTime.now(APP_ZONE);
+        dsl.insertInto(MONTHLY_ATTENDANCE_SUMMARIES)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.ID, UUID.randomUUID())
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.EMPLOYEE_ID, employeeId)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.EMPLOYEE_NAME, emp.name)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.DEPARTMENT_ID, emp.departmentId)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.YEAR, year)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.MONTH, month)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_WORK_DAYS, agg.totalWorkDays)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_WORK_MINUTES, agg.totalWorkMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_OVERTIME_MINUTES, agg.totalOvertimeMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_LATE_NIGHT_MINUTES, agg.totalLateNightMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_HOLIDAY_MINUTES, agg.totalHolidayMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_BREAK_MINUTES, agg.totalBreakMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.PAID_LEAVE_USED, BigDecimal.ZERO)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.CREATED_AT, now)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.UPDATED_AT, now)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.CREATED_BY, SYSTEM_USER)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.UPDATED_BY, SYSTEM_USER)
+                .onConflict(
+                        MONTHLY_ATTENDANCE_SUMMARIES.EMPLOYEE_ID,
+                        MONTHLY_ATTENDANCE_SUMMARIES.YEAR,
+                        MONTHLY_ATTENDANCE_SUMMARIES.MONTH)
+                .doUpdate()
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.EMPLOYEE_NAME, emp.name)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.DEPARTMENT_ID, emp.departmentId)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_WORK_DAYS, agg.totalWorkDays)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_WORK_MINUTES, agg.totalWorkMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_OVERTIME_MINUTES, agg.totalOvertimeMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_LATE_NIGHT_MINUTES, agg.totalLateNightMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_HOLIDAY_MINUTES, agg.totalHolidayMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.TOTAL_BREAK_MINUTES, agg.totalBreakMinutes)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.UPDATED_AT, now)
+                .set(MONTHLY_ATTENDANCE_SUMMARIES.UPDATED_BY, SYSTEM_USER)
+                .execute();
 
         log.debug("月次サマリー更新完了: employeeId={}, year={}, month={}, workDays={}",
-                employeeId, year, month, totalWorkDays);
+                employeeId, year, month, agg.totalWorkDays);
 
         // ---- 4. 部門統計マテリアライズドビューをリフレッシュする ----
         departmentStatsRefresher.refresh();
@@ -105,90 +129,70 @@ public class MonthlySummaryProjector {
     /**
      * 日次サマリーから月次集計値を算出する
      *
-     * <p>attendance_summariesから指定従業員・年月のレコードを集約し、
+     * <p>attendance_summaries から指定従業員・年月のレコードを集約し、
      * 出勤日数・勤務時間・残業時間等を計算する。
-     * CLOCKED_OUTまたはFINALIZEDのレコードを出勤日としてカウントする。</p>
+     * CLOCKED_OUT または FINALIZED のレコードを出勤日としてカウントする。</p>
      */
-    private Object[] aggregateDailySummaries(String employeeId, short year, short month) {
-        try {
-            return (Object[]) entityManager.createQuery(
-                    // CLOCKED_OUT/FINALIZEDの日数を出勤日数としてカウントする
-                    "SELECT " +
-                    "  SUM(CASE WHEN s.status IN ('CLOCKED_OUT','FINALIZED') THEN 1 ELSE 0 END), " +
-                    "  COALESCE(SUM(s.netWorkMinutes), 0), " +
-                    "  COALESCE(SUM(s.totalOvertimeMinutes), 0), " +
-                    "  COALESCE(SUM(s.lateNightMinutes), 0), " +
-                    "  COALESCE(SUM(s.holidayMinutes), 0), " +
-                    "  COALESCE(SUM(s.breakMinutes), 0) " +
-                    "FROM AttendanceSummaryJpaEntity s " +
-                    "WHERE s.employeeId = :employeeId " +
-                    "  AND EXTRACT(YEAR FROM s.workDate) = :year " +
-                    "  AND EXTRACT(MONTH FROM s.workDate) = :month " +
-                    "  AND s.deletedAt IS NULL"
-            )
-            .setParameter("employeeId", employeeId)
-            .setParameter("year", (int) year)
-            .setParameter("month", (int) month)
-            .getSingleResult();
-        } catch (NoResultException e) {
+    private Aggregation aggregateDailySummaries(String employeeId, short year, short month) {
+        Record6<Integer, Integer, Integer, Integer, Integer, Integer> row = dsl.select(
+                        // CLOCKED_OUT/FINALIZED の日数を出勤日数としてカウント
+                        DSL.coalesce(DSL.sum(DSL.when(
+                                ATTENDANCE_SUMMARIES.STATUS.in("CLOCKED_OUT", "FINALIZED"),
+                                DSL.inline(1)).otherwise(DSL.inline(0))), DSL.inline(0))
+                                .cast(Integer.class),
+                        DSL.coalesce(DSL.sum(ATTENDANCE_SUMMARIES.NET_WORK_MINUTES), DSL.inline(0)).cast(Integer.class),
+                        DSL.coalesce(DSL.sum(ATTENDANCE_SUMMARIES.TOTAL_OVERTIME_MINUTES), DSL.inline(0)).cast(Integer.class),
+                        DSL.coalesce(DSL.sum(ATTENDANCE_SUMMARIES.LATE_NIGHT_MINUTES), DSL.inline(0)).cast(Integer.class),
+                        DSL.coalesce(DSL.sum(ATTENDANCE_SUMMARIES.HOLIDAY_MINUTES), DSL.inline(0)).cast(Integer.class),
+                        DSL.coalesce(DSL.sum(ATTENDANCE_SUMMARIES.BREAK_MINUTES), DSL.inline(0)).cast(Integer.class))
+                .from(ATTENDANCE_SUMMARIES)
+                .where(ATTENDANCE_SUMMARIES.EMPLOYEE_ID.eq(employeeId))
+                .and(DSL.extract(ATTENDANCE_SUMMARIES.WORK_DATE, DatePart.YEAR).eq((int) year))
+                .and(DSL.extract(ATTENDANCE_SUMMARIES.WORK_DATE, DatePart.MONTH).eq((int) month))
+                .and(ATTENDANCE_SUMMARIES.DELETED_AT.isNull())
+                .fetchOne();
+
+        if (row == null) {
             return null;
         }
+        return new Aggregation(
+                toInt(row.value1()),
+                toInt(row.value2()),
+                toInt(row.value3()),
+                toInt(row.value4()),
+                toInt(row.value5()),
+                toInt(row.value6()));
     }
 
     /**
-     * employeesテーブルから従業員名と部門IDを取得する
+     * employees テーブルから従業員名と部門ID を取得する
      *
-     * <p>月次サマリーに非正規化して保持するための従業員情報を取得する。
-     * employeesテーブルのemployee_idはVARCHAR(36)のため文字列で検索する。</p>
+     * <p>月次サマリーに非正規化して保持するための従業員情報を取得する。</p>
      */
-    private Object[] lookupEmployeeInfo(String employeeId) {
-        try {
-            return (Object[]) entityManager.createNativeQuery(
-                    // 従業員名と部門IDを取得する
-                    "SELECT name, department_id FROM employees WHERE employee_id = :id"
-            )
-            .setParameter("id", employeeId)
-            .getSingleResult();
-        } catch (NoResultException e) {
+    private EmployeeInfo lookupEmployeeInfo(String employeeId) {
+        Record2<String, String> row = dsl.select(EMPLOYEES.NAME, EMPLOYEES.DEPARTMENT_ID)
+                .from(EMPLOYEES)
+                .where(EMPLOYEES.EMPLOYEE_ID.eq(employeeId))
+                .fetchOne();
+        if (row == null) {
             return null;
         }
+        return new EmployeeInfo(row.value1(), row.value2());
     }
 
-    /**
-     * 月次サマリーを取得する。存在しない場合は新規作成する
-     *
-     * <p>employee_id + year + month のUNIQUE制約に基づいて検索する。
-     * 初回はUUIDを自動生成して新規エンティティを作成する。</p>
-     */
-    private MonthlySummaryJpaEntity findOrCreateMonthlySummary(
-            String employeeId, String employeeName, String departmentId,
-            short year, short month) {
-
-        // employee_id + year + month で既存レコードを検索する
-        return entityManager.createQuery(
-                "SELECT m FROM MonthlySummaryJpaEntity m " +
-                "WHERE m.employeeId = :employeeId AND m.year = :year AND m.month = :month",
-                MonthlySummaryJpaEntity.class
-        )
-        .setParameter("employeeId", employeeId)
-        .setParameter("year", year)
-        .setParameter("month", month)
-        .getResultStream()
-        .findFirst()
-        .orElseGet(() -> {
-            // 初回: 新規月次サマリーを作成する
-            log.debug("新規月次サマリー作成: employeeId={}, year={}, month={}", employeeId, year, month);
-            return new MonthlySummaryJpaEntity(
-                    UUID.randomUUID(), employeeId, employeeName,
-                    departmentId, year, month);
-        });
+    private int toInt(Integer value) {
+        return value == null ? 0 : value;
     }
 
-    /**
-     * Object値をint型に安全に変換する（null → 0）
-     */
-    private int toInt(Object value) {
-        if (value == null) return 0;
-        return ((Number) value).intValue();
-    }
+    /** 集計結果の内部 DTO */
+    private record Aggregation(
+            int totalWorkDays,
+            int totalWorkMinutes,
+            int totalOvertimeMinutes,
+            int totalLateNightMinutes,
+            int totalHolidayMinutes,
+            int totalBreakMinutes) {}
+
+    /** 従業員情報の内部 DTO */
+    private record EmployeeInfo(String name, String departmentId) {}
 }
